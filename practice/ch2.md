@@ -1,11 +1,12 @@
-# ch2. 練習題 — 路徑、權限與 umask
+# ch2. 練習題 — 路徑、權限、文字工具、YaST 與系統設定
 
-依 `raw/ch2.md` 整理的實作與問答練習。目標：理解 **Absolute Path / Relative Path**，讀懂 `ls -l` 權限字串，會用 `chmod`／`umask`，並說明檔案與目錄上 `r`／`x` 的差異，以及 **SUID／SGID／Sticky Bit**。
+依 `raw/ch2.md`、`raw/ch2-3.md` 整理的實作與問答練習。目標：理解 **Absolute Path / Relative Path**，讀懂權限與 `umask`／特殊權限；熟練 `cat`／`grep`／`head`／`tail`／`more`／`less`；會用 **YaST** 與指令列設定網路、防火牆與 **zypper**。
 
 **建議環境**
 
 - SLES 15（或相容 Linux）任一台可登入的系統
 - 一般使用者帳號（範例使用者名：`alex`；實作時可改為目前登入使用者）
+- 練習 4～5 部分步驟需要 `root` 或 `sudo`，以及可用的網路介面
 
 ---
 
@@ -187,4 +188,183 @@ chmod u+s <file>
 chmod g+s <dir>
 chmod +t /tmp
 # 或數字模式（如 4755、2755、1777）並說明各位元意義
+```
+
+---
+
+## 練習 3. 文字處理工具（cat / grep / head / tail / more / less）
+
+### 3-1. 建立並查詢 `log.txt`
+
+使用 `cat`（heredoc 或互動輸入）將下列內容寫入 `log.txt`：
+
+```text
+INFO Server started
+INFO Loading config
+ERROR Connection failed
+WARNING CPU usage high
+INFO User alice logged in
+ERROR Authentication failed
+INFO User bob logged in
+WARNING Memory usage high
+ERROR Connection timeout
+INFO Server restarted
+```
+
+完成下列任務，並寫下使用的指令與結果摘要：
+
+| 小題  | 任務                         | 建議指令方向                     |
+| ----- | ---------------------------- | -------------------------------- |
+| 3-1-1 | 將內容寫入 `log.txt`         | `cat > log.txt << 'EOF' ... EOF` |
+| 3-1-2 | 顯示 `log.txt` **全部內容**  | `cat log.txt`                    |
+| 3-1-3 | 顯示全部內容，並**顯示行號** | `cat -n log.txt` 或 `nl log.txt` |
+| 3-1-4 | 只顯示**前 3 行**            | `head -n 3 log.txt`              |
+| 3-1-5 | 只顯示**最後 3 行**          | `tail -n 3 log.txt`              |
+| 3-1-6 | 找出所有含 **ERROR** 的行    | `grep ERROR log.txt`             |
+| 3-1-7 | 找出所有**不是 INFO** 的行   | `grep -v INFO log.txt`           |
+
+### 3-2. 持續顯示系統日誌
+
+對系統日誌做**持續追蹤**（follow）：
+
+```bash
+# SLES 上常見路徑可能是 /var/log/messages；若存在 syslog 則用下列指令
+sudo tail -f /var/log/messages
+# 或
+sudo tail -f /var/log/syslog
+```
+
+| 小題  | 任務                                                                               |
+| ----- | ---------------------------------------------------------------------------------- |
+| 3-2-1 | 寫出實際使用的檔案路徑與指令                                                       |
+| 3-2-2 | 說明 `tail -f` 的意義，以及如何結束追蹤（通常 `Ctrl+C`）                           |
+| 3-2-3 | （加分）另開終端產生一點日誌（如失敗登入／重載服務），觀察 follow 畫面是否出現新行 |
+
+### 3-3. 過濾設定檔：去掉空白行與註解
+
+針對 `/etc/ssh/ssh_config`（或系統上存在的同等檔），**不要顯示空白行與註解行**（以 `#` 開頭的註解為主）。
+
+```bash
+# 參考方向（可調整）
+grep -vE '^\s*(#|$)' /etc/ssh/ssh_config
+# 或分步：去掉註解、再去掉空行
+```
+
+| 小題  | 任務                                    |
+| ----- | --------------------------------------- |
+| 3-3-1 | 寫出完整指令                            |
+| 3-3-2 | 附上過濾後輸出的前若干行作為證明        |
+| 3-3-3 | 簡述 `grep -v` 與正規表示式在此題的作用 |
+
+### 3-4. `more` 分頁瀏覽
+
+```bash
+more /etc/passwd
+```
+
+| 操作                  | 請寫出按鍵／作法 |
+| --------------------- | ---------------- |
+| 往下一頁              |                  |
+| 往下一行              |                  |
+| 離開 `more`（若適用） |                  |
+
+### 3-5. `less` 瀏覽與搜尋
+
+```bash
+less /etc/passwd
+```
+
+| 操作         | 請寫出按鍵／指令 |
+| ------------ | ---------------- |
+| 往下移動     |                  |
+| 往上移動     |                  |
+| 回到檔案開頭 |                  |
+| 跳到檔案結尾 |                  |
+| 搜尋 `root`  |                  |
+| 搜尋 `bash`  |                  |
+| 離開 `less`  |                  |
+
+---
+
+## 練習 4. YaST（TUI / GUI）
+
+在 SLES 上分別體驗文字與圖形介面的 YaST，並完成網路、防火牆與軟體相關設定（實驗室環境可操作；正式機請謹慎）。
+
+| 小題 | 任務                                                                | 參考                                                |
+| ---- | ------------------------------------------------------------------- | --------------------------------------------------- |
+| 4-1  | 在 **TUI** 使用 YaST                                                | `sudo yast` 或 `sudo yast2`（文字模式）             |
+| 4-2  | 在 **GUI** 使用 YaST                                                | 圖形桌面啟動 YaST，或具 X11／遠端桌面時執行 `yast2` |
+| 4-3  | 使用 YaST 設定 **Network（網路）** 與 **Firewall（防火牆）**        | 模組如 `yast lan`、`yast firewall`                  |
+| 4-4  | 使用 YaST 設定 **Repository（軟體庫）** 與 **Software（安裝軟體）** | 模組如 `yast repositories`、`yast sw_single`        |
+
+---
+
+## 練習 5. 指令列：網路、防火牆、zypper
+
+> 操作前建議備份設定檔；靜態 IP 請使用實驗室網段、避免位址衝突。
+
+### 5-1. 網路介面（ifcfg + wicked）
+
+編輯 `/etc/sysconfig/network/ifcfg-<interface>`（將 `<interface>` 換成實際名稱，如 `eth0`）。
+
+| 小題  | 任務                                                                                |
+| ----- | ----------------------------------------------------------------------------------- |
+| 5-1-1 | 使用 `vi`（或 `vim`）設定 **Static IP**（含 `BOOTPROTO`、`IPADDR`、`STARTMODE` 等） |
+| 5-1-2 | 使用 `vi` 設定 **DHCP**（`BOOTPROTO='dhcp'` 等）                                    |
+| 5-1-3 | 使用 `wicked` 對介面執行 **up / down / show**，並記錄結果                           |
+
+**參考片段**
+
+```ini
+# Static 概念
+BOOTPROTO='static'
+STARTMODE='auto'
+IPADDR='192.168.x.y/24'
+GATEWAY='192.168.x.1'
+
+# DHCP 概念
+BOOTPROTO='dhcp'
+STARTMODE='auto'
+```
+
+```bash
+sudo wicked ifdown <interface>
+sudo wicked ifup <interface>
+sudo wicked show <interface>
+# 或 ifreload
+sudo wicked ifreload <interface>
+```
+
+### 5-2. firewall-cmd
+
+| 小題  | 任務                            | 參考型態                                          |
+| ----- | ------------------------------- | ------------------------------------------------- |
+| 5-2-1 | **add service**（永久＋reload） | `firewall-cmd --permanent --add-service=ssh`      |
+| 5-2-2 | **del service**                 | `firewall-cmd --permanent --remove-service=...`   |
+| 5-2-3 | **add port**                    | `firewall-cmd --permanent --add-port=8080/tcp`    |
+| 5-2-4 | **del port**                    | `firewall-cmd --permanent --remove-port=8080/tcp` |
+
+每次永久變更後執行：
+
+```bash
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all
+```
+
+### 5-3. zypper 軟體庫與套件
+
+| 小題  | 任務                | 參考型態                                      |
+| ----- | ------------------- | --------------------------------------------- |
+| 5-3-1 | **add repo**        | `zypper ar <URI> <alias>` 或 `zypper addrepo` |
+| 5-3-2 | **del repo**        | `zypper rr <alias>` 或 `zypper removerepo`    |
+| 5-3-3 | **search package**  | `zypper se <keyword>`                         |
+| 5-3-4 | **install package** | `zypper in <package>`                         |
+| 5-3-5 | **remove package**  | `zypper rm <package>`                         |
+
+驗證常用：
+
+```bash
+sudo zypper lr -d
+sudo zypper se vim
+rpm -q <package>
 ```
