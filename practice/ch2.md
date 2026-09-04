@@ -1,12 +1,12 @@
-# ch2. 練習題 — 路徑、權限、文字工具、YaST 與系統設定
+# ch2. 練習題 — 路徑、權限、文字工具、YaST、系統設定、帳號與 sudo
 
-依 `raw/ch2.md`、`raw/ch2-3.md` 整理的實作與問答練習。目標：理解 **Absolute Path / Relative Path**，讀懂權限與 `umask`／特殊權限；熟練 `cat`／`grep`／`head`／`tail`／`more`／`less`；會用 **YaST** 與指令列設定網路、防火牆與 **zypper**。
+依 `raw/ch2.md`、`raw/ch2-3.md`、`raw/ch2-6.md` 整理的實作與問答練習。目標：理解路徑與權限；熟練文字工具與 YaST / 網路 / 防火牆 / zypper；能管理 **user / group / 密碼老化**，並以 **`/etc/sudoers.d/`** 做最小權限的 `sudo` 設定。
 
 **建議環境**
 
 - SLES 15（或相容 Linux）任一台可登入的系統
 - 一般使用者帳號（範例使用者名：`alex`；實作時可改為目前登入使用者）
-- 練習 4～5 部分步驟需要 `root` 或 `sudo`，以及可用的網路介面
+- 練習 4～7 部分步驟需要 `root` 或已具管理權的帳號；請在實驗機操作，避免鎖死唯一管理管道
 
 ---
 
@@ -328,11 +328,11 @@ STARTMODE='auto'
 ```
 
 ```bash
-sudo wicked ifdown <interface>
-sudo wicked ifup <interface>
-sudo wicked show <interface>
+wicked ifdown <interface>
+wicked ifup <interface>
+wicked show <interface>
 # 或 ifreload
-sudo wicked ifreload <interface>
+wicked ifreload <interface>
 ```
 
 ### 5-2. firewall-cmd
@@ -347,8 +347,8 @@ sudo wicked ifreload <interface>
 每次永久變更後執行：
 
 ```bash
-sudo firewall-cmd --reload
-sudo firewall-cmd --list-all
+firewall-cmd --reload
+firewall-cmd --list-all
 ```
 
 ### 5-3. zypper 軟體庫與套件
@@ -364,7 +364,125 @@ sudo firewall-cmd --list-all
 驗證常用：
 
 ```bash
-sudo zypper lr -d
-sudo zypper se vim
+zypper lr -d
+zypper se vim
 rpm -q <package>
 ```
+
+---
+
+## 練習 6. 使用者、群組與密碼政策
+
+> 需 `root` 權限。完成後可用 `id`、`getent`、`chage -l` 驗證。實驗結束可刪除測試帳號／群組。
+
+### 6-1. 使用者與群組操作
+
+| 小題  | 任務                                                                                | 參考指令方向                                            |
+| ----- | ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 6-1-1 | 建立群組 **`jjc_lab`**                                                              | `groupadd jjc_lab`                                      |
+| 6-1-2 | 建立使用者 **`alice`**，並直接指定其**次要群組（Supplementary Group）**為 `jjc_lab` | `useradd -m -G jjc_lab alice`（注意 `-G` 與 `-g` 差異） |
+| 6-1-3 | 建立另一個使用者 **`bob`**（採系統預設設定，含家目錄等）                            | `useradd -m bob`                                        |
+| 6-1-4 | 設定 `alice` 與 `bob` 的密碼                                                        | `passwd alice`、`passwd bob`                            |
+| 6-1-5 | 查看 `alice` 的密碼狀態與過期設定                                                   | `chage -l alice`、`passwd -S alice`                     |
+| 6-1-6 | 設定 `bob` **第一次登入時強制更換密碼**                                             | `chage -d 0 bob` 或 `passwd -e bob`                     |
+| 6-1-7 | 將 `bob` **加入** `jjc_lab`（保留既有補充群組）                                     | `usermod -aG jjc_lab bob`                               |
+| 6-1-8 | 從 `jjc_lab` **移除** `alice`                                                       | `gpasswd -d alice jjc_lab` 或等價作法                   |
+
+**驗證建議**
+
+```bash
+getent group jjc_lab
+id alice
+id bob
+chage -l alice
+chage -l bob
+```
+
+| 注意  | 說明                                                           |
+| ----- | -------------------------------------------------------------- |
+| `-g`  | 主要群組（Primary Group）                                      |
+| `-G`  | 補充群組清單；若無 `-a`，`usermod -G` 可能**覆蓋**既有補充群組 |
+| `-aG` | **附加**到補充群組，通常較安全                                 |
+
+### 6-2. 密碼過期情境（chage／政策）
+
+依下列情境設計並實作（可指定套用在 `alice`／`bob` 或另建測試帳號），寫出指令與 `chage -l` 驗證結果。
+
+| 小題  | 情境           | 需求摘要                                                                                                                           |
+| ----- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 6-2-1 | 週期性密碼政策 | 每 **90** 天過期；過期前 **14** 天警告；過期後 **7** 天內仍可登入修改（inactive／寬限）；且修改後至少 **1** 天才能再改（最小間隔） |
+| 6-2-2 | 週期 + 離職日  | 採用與 6-2-1 **相同**的密碼週期，但帳號在 **2026-12-31** 後自動失效                                                                |
+| 6-2-3 | 強制首次改密   | 新開帳號或管理員重置密碼後，強制使用者**第一次登入自行修改**                                                                       |
+| 6-2-4 | 預設套用全體   | 使**新建的所有帳號**預設都套用相同密碼安全政策（說明應改哪些預設檔，如 `/etc/login.defs` 等，並驗證新建測試帳號）                  |
+
+**`chage` 參數對照（概念）**
+
+| 選項            | 意義                             |
+| --------------- | -------------------------------- |
+| `-M 90`         | 最大密碼天數                     |
+| `-W 14`         | 到期前提醒天數                   |
+| `-I 7`          | 過期後多少天停用（inactive）     |
+| `-m 1`          | 兩次改密最短間隔天數             |
+| `-E 2026-12-31` | 帳戶到期日                       |
+| `-d 0`          | 視同密碼已過期，強制下次登入修改 |
+
+```bash
+# 6-2-1 概念示例（請依實際帳號調整）
+chage -m 1 -M 90 -W 14 -I 7 <user>
+chage -l <user>
+
+# 6-2-2
+chage -m 1 -M 90 -W 14 -I 7 -E 2026-12-31 <user>
+
+# 6-2-3
+passwd -e <user>
+# 或
+chage -d 0 <user>
+```
+
+---
+
+## 練習 7. su / sudo 與 sudoers.d
+
+> 務必使用 `visudo` 或 `visudo -f /etc/sudoers.d/<file>` 編輯，避免語法錯誤鎖死管理。建議另開一個已具權限的 session 再測試。
+
+### 7-1. 限制 `su`，僅特定帳號可用 `sudo su -`
+
+| 目標     | 說明                                                                             |
+| -------- | -------------------------------------------------------------------------------- |
+| 一般帳號 | **不能**隨意使用 `su` 切換（依發行版可用 PAM／政策限制；請寫出採用的方法與驗證） |
+| 特定帳號 | 僅允許指定帳號執行 `sudo su -`（或等價取得 login shell 的 root）                 |
+
+驗收：
+
+1. 一般測試帳號執行 `su -`／`sudo su -` 應失敗或被拒絕。
+2. 授權帳號可成功 `sudo su -` 並以 root 環境運作（注意與 `su`、`su -` 差異）。
+
+### 7-2. 為 `myadmin` 建立獨立 sudoers 設定
+
+1. 建立使用者 **`myadmin`**（若不存在）並設定密碼。
+2. 在 **`/etc/sudoers.d/`** 新增獨立檔案（勿直接改壞主檔 `/etc/sudoers`）。
+3. 使用：
+
+```bash
+visudo -f /etc/sudoers.d/myadmin
+```
+
+4. 寫入適合實驗室的規則（例如允許 `myadmin` 執行管理指令或 `ALL`，並說明為何這樣設計）。
+5. 確認檔案權限合適（通常 `0440`），並用 `sudo -l -U myadmin` 驗證。
+
+### 7-3. `poweroff` 群組可關機
+
+1. 建立群組 **`poweroff`**。
+2. 將測試使用者加入該群組。
+3. 在 `/etc/sudoers.d/` 設定：該群組成員可執行關機相關指令（如 `/sbin/poweroff`、`/sbin/shutdown` 等，路徑以 `which` 為準）。
+4. 以該使用者測試 `sudo poweroff` 或 `sudo shutdown`（虛擬機環境可測；注意會關機）。
+5. 證明非群組成員無法執行相同 sudo 關機指令。
+
+**規則概念示例**（請依實際路徑調整，且必須用 visudo 寫入）：
+
+```text
+%poweroff ALL=(root) NOPASSWD: /usr/sbin/poweroff, /usr/sbin/shutdown
+```
+
+（是否使用 `NOPASSWD` 請自行評估並在報告中說明安全取捨。）

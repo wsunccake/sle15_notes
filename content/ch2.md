@@ -14,11 +14,11 @@ sle15:~ # shutdown -h 0
 sle15:~ # uptime
 ```
 
-| 指令 | 說明 | 意義 |
-| --- | --- | --- |
-| `reboot` | 重新啟動系統 | 套用核心、驅動或需重開才生效的設定後使用 |
-| `shutdown` | 關機、重啟或延遲關機 | 可通知服務優雅結束；`-h 0` 表示立即 halt |
-| `uptime` | 顯示開機後運行時間與負載 | 快速確認系統是否剛重開、負載是否異常 |
+| 指令       | 說明                     | 意義                                     |
+| ---------- | ------------------------ | ---------------------------------------- |
+| `reboot`   | 重新啟動系統             | 套用核心、驅動或需重開才生效的設定後使用 |
+| `shutdown` | 關機、重啟或延遲關機     | 可通知服務優雅結束；`-h 0` 表示立即 halt |
+| `uptime`   | 顯示開機後運行時間與負載 | 快速確認系統是否剛重開、負載是否異常     |
 
 - **`shutdown` 常用型態**:
   - `shutdown -h now` / `shutdown -h 0`：立即關機
@@ -38,23 +38,23 @@ sle15:~ # cd abc
 sle15:~ # cd ..
 ```
 
-| 指令 | 說明 | 意義 |
-| --- | --- | --- |
-| `pwd` | 顯示目前工作目錄（Print Working Directory） | 確認「人在哪裡」，避免對錯路徑操作 |
-| `ls` | 列出目錄內容 | `-l` 詳細、`-a` 含隱藏檔（`.` 開頭） |
-| `cd` | 切換目錄 | `~` / `$HOME` 回家目錄；`..` 上一層 |
-| `mkdir` | 建立目錄 | 可搭配 `-p` 建立多層路徑 |
-| `rmdir` | 刪除空目錄 | 目錄非空會失敗，較安全 |
-| `cp` | 複製檔案／目錄 | 目錄需 `-r`；保留屬性常用 `-a` |
-| `mv` | 移動或重新命名 | 同檔系統多為 rename，跨檔系統才真正搬移 |
-| `rm` | 刪除檔案／目錄 | 目錄用 `-r`；危險操作，刪除後不易回復 |
+| 指令    | 說明                                        | 意義                                    |
+| ------- | ------------------------------------------- | --------------------------------------- |
+| `pwd`   | 顯示目前工作目錄（Print Working Directory） | 確認「人在哪裡」，避免對錯路徑操作      |
+| `ls`    | 列出目錄內容                                | `-l` 詳細、`-a` 含隱藏檔（`.` 開頭）    |
+| `cd`    | 切換目錄                                    | `~` / `$HOME` 回家目錄；`..` 上一層     |
+| `mkdir` | 建立目錄                                    | 可搭配 `-p` 建立多層路徑                |
+| `rmdir` | 刪除空目錄                                  | 目錄非空會失敗，較安全                  |
+| `cp`    | 複製檔案／目錄                              | 目錄需 `-r`；保留屬性常用 `-a`          |
+| `mv`    | 移動或重新命名                              | 同檔系統多為 rename，跨檔系統才真正搬移 |
+| `rm`    | 刪除檔案／目錄                              | 目錄用 `-r`；危險操作，刪除後不易回復   |
 
 #### 建議練習流程（步驟與意義）
 
-1. **`pwd`**：確認當前路徑  
-2. **`cd ~`**：回到家目錄，建立固定起點  
-3. **`mkdir abc && cd abc`**：建立練習目錄並進入  
-4. **`ls -la`**：觀察 `.`、`..` 與權限欄位  
+1. **`pwd`**：確認當前路徑
+2. **`cd ~`**：回到家目錄，建立固定起點
+3. **`mkdir abc && cd abc`**：建立練習目錄並進入
+4. **`ls -la`**：觀察 `.`、`..` 與權限欄位
 5. **`cd ..`**：回到上一層，理解相對路徑
 
 ### 學習心得：基礎指令
@@ -77,29 +77,29 @@ sle15:~ # cd ..
 
 ### 相關指令
 
-| 指令 | 說明 |
-| --- | --- |
-| `ls -l` / `ls -la` | 顯示權限、擁有者、大小、時間 |
-| `chmod` | 修改權限 |
-| `chown` / `chgrp` | 修改擁有者／群組 |
-| `stat` | 顯示 inode、權限、時間戳等細節 |
+| 指令               | 說明                           |
+| ------------------ | ------------------------------ |
+| `ls -l` / `ls -la` | 顯示權限、擁有者、大小、時間   |
+| `chmod`            | 修改權限                       |
+| `chown` / `chgrp`  | 修改擁有者／群組               |
+| `stat`             | 顯示 inode、權限、時間戳等細節 |
 
 ### 使用者身份（User types）
 
-| 類別 | 說明 |
-| --- | --- |
-| `u` | 擁有者（User / Owner） |
-| `g` | 群組（Group） |
-| `o` | 其他人（Others） |
-| `a` | 所有身份（All = u+g+o） |
+| 類別 | 說明                    |
+| ---- | ----------------------- |
+| `u`  | 擁有者（User / Owner）  |
+| `g`  | 群組（Group）           |
+| `o`  | 其他人（Others）        |
+| `a`  | 所有身份（All = u+g+o） |
 
 ### 權限種類（Permissions）
 
-| 符號 | 名稱 | 對檔案 | 對目錄 |
-| --- | --- | --- | --- |
-| `r` | read | 讀取內容 | 列出內容（`ls`） |
-| `w` | write | 修改內容 | 建立／刪除／改名 |
-| `x` | execute | 執行程式／腳本 | 進入目錄（`cd`） |
+| 符號 | 名稱    | 對檔案         | 對目錄           |
+| ---- | ------- | -------------- | ---------------- |
+| `r`  | read    | 讀取內容       | 列出內容（`ls`） |
+| `w`  | write   | 修改內容       | 建立／刪除／改名 |
+| `x`  | execute | 執行程式／腳本 | 進入目錄（`cd`） |
 
 ### 權限顯示方式
 
@@ -108,12 +108,12 @@ sle15:~ # ls -l
 -rwxr-xr-- 1 kai users 1234 Jul  7 10:00 myfile.sh
 ```
 
-| 欄位 | 說明 |
-| --- | --- |
-| `-` | 類型：`-` 一般檔、`d` 目錄、`l` 符號連結 |
-| `rwx` | owner 權限 |
-| `r-x` | group 權限 |
-| `r--` | others 權限 |
+| 欄位  | 說明                                     |
+| ----- | ---------------------------------------- |
+| `-`   | 類型：`-` 一般檔、`d` 目錄、`l` 符號連結 |
+| `rwx` | owner 權限                               |
+| `r-x` | group 權限                               |
+| `r--` | others 權限                              |
 
 ### 修改權限：Symbolic / Octal
 
@@ -130,10 +130,10 @@ sle15:~ # chmod 644 myfile.txt    # u=rw, g=r, o=r
 ```
 
 | 權限 | 數字 |
-| --- | --- |
-| `r` | 4 |
-| `w` | 2 |
-| `x` | 1 |
+| ---- | ---- |
+| `r`  | 4    |
+| `w`  | 2    |
+| `x`  | 1    |
 
 - **換算意義**: `7=4+2+1`（rwx）、`5=4+1`（r-x）、`4`（r--）。
 - **常見組合**:
@@ -153,23 +153,23 @@ sle15:~ # chgrp devs myfile.sh
 
 ### 目錄權限提醒
 
-| 權限 | 功能 |
-| --- | --- |
-| `r` | 可 `ls` 列出 |
-| `x` | 可 `cd` 進入 |
-| `w` | 可在目錄內建立／刪除／改名 |
-| `rx` | 可列出並進入 |
+| 權限 | 功能                       |
+| ---- | -------------------------- |
+| `r`  | 可 `ls` 列出               |
+| `x`  | 可 `cd` 進入               |
+| `w`  | 可在目錄內建立／刪除／改名 |
+| `rx` | 可列出並進入               |
 
 - 只有 `r` 沒有 `x`：無法 `cd` 進入該目錄。
 - 目錄的 `w` 影響的是「目錄條目」，即使檔案本身不可寫，仍可能被有目錄寫入權的人刪除（除非 sticky bit）。
 
 ### 特殊權限（進階）
 
-| 權限位 | 名稱 | 用途 |
-| --- | --- | --- |
-| `s`（user） | setuid | 程式以檔案擁有者身分執行 |
+| 權限位       | 名稱   | 用途                                             |
+| ------------ | ------ | ------------------------------------------------ |
+| `s`（user）  | setuid | 程式以檔案擁有者身分執行                         |
 | `s`（group） | setgid | 程式／目錄以群組身分運作；目錄下新建檔常繼承群組 |
-| `t` | sticky | 常見於 `/tmp`：僅擁有者（或 root）可刪自己的檔 |
+| `t`          | sticky | 常見於 `/tmp`：僅擁有者（或 root）可刪自己的檔   |
 
 ```bash
 sle15:~ # chmod u+s myprog
@@ -193,14 +193,14 @@ sle15:~ # chmod +t /tmp
 
 ## 2-3. 文字處理入門指令
 
-| 指令 | 說明 | 典型用途 |
-| --- | --- | --- |
-| `cat` | 顯示／串接檔案 | 看短檔、合併輸出 |
-| `less` | 可上下捲動的分頁檢視 | 讀長檔、日誌 |
-| `grep` | 依關鍵字／正規表示式搜尋 | 從日誌找錯誤 |
-| `head` | 顯示前幾行 | 快速預覽 |
-| `tail` | 顯示後幾行 | 看最新日誌；`-f` 追蹤 |
-| `man` | 查詢指令說明 | 正式文件來源 |
+| 指令   | 說明                     | 典型用途              |
+| ------ | ------------------------ | --------------------- |
+| `cat`  | 顯示／串接檔案           | 看短檔、合併輸出      |
+| `less` | 可上下捲動的分頁檢視     | 讀長檔、日誌          |
+| `grep` | 依關鍵字／正規表示式搜尋 | 從日誌找錯誤          |
+| `head` | 顯示前幾行               | 快速預覽              |
+| `tail` | 顯示後幾行               | 看最新日誌；`-f` 追蹤 |
+| `man`  | 查詢指令說明             | 正式文件來源          |
 
 - 更完整的文字工具說明見本章 **2-10. Text**。
 
@@ -254,15 +254,15 @@ sle15:~ # yast host
 sle15:~ # yast partitioner
 ```
 
-| 模組 | 意義 |
-| --- | --- |
-| `yast lan` | 設定網卡、DHCP／靜態 IP |
-| `yast firewall` | 管理防火牆區域與服務 |
-| `yast repositories` | 管理軟體庫來源 |
-| `yast sw_single` | 單套件安裝／移除介面 |
-| `yast users` | 使用者與群組 |
-| `yast host` | 主機名稱／hosts 相關 |
-| `yast partitioner` | 磁碟分割（注意拼字為 partitioner） |
+| 模組                | 意義                               |
+| ------------------- | ---------------------------------- |
+| `yast lan`          | 設定網卡、DHCP／靜態 IP            |
+| `yast firewall`     | 管理防火牆區域與服務               |
+| `yast repositories` | 管理軟體庫來源                     |
+| `yast sw_single`    | 單套件安裝／移除介面               |
+| `yast users`        | 使用者與群組                       |
+| `yast host`         | 主機名稱／hosts 相關               |
+| `yast partitioner`  | 磁碟分割（注意拼字為 partitioner） |
 
 ### 學習心得：YaST
 
@@ -309,12 +309,12 @@ BOOTPROTO='dhcp'
 STARTMODE='auto'
 ```
 
-| 參數 | 意義 |
-| --- | --- |
-| `BOOTPROTO` | `static` 或 `dhcp` |
-| `STARTMODE=auto` | 開機自動啟用介面 |
-| `IPADDR` | 位址＋CIDR（含遮罩資訊） |
-| `GATEWAY` | 預設閘道 |
+| 參數             | 意義                     |
+| ---------------- | ------------------------ |
+| `BOOTPROTO`      | `static` 或 `dhcp`       |
+| `STARTMODE=auto` | 開機自動啟用介面         |
+| `IPADDR`         | 位址＋CIDR（含遮罩資訊） |
+| `GATEWAY`        | 預設閘道                 |
 
 #### 套用與檢查（wicked）
 
@@ -327,17 +327,17 @@ sle15:~ # wicked ifup eth0
 sle15:~ # wicked show eth0
 ```
 
-| 指令 | 意義 |
-| --- | --- |
-| `ifreload` | 依設定檔重新載入 |
-| `ifdown` / `ifup` | 關閉／啟用介面 |
-| `show` | 檢視目前狀態、位址 |
+| 指令              | 意義               |
+| ----------------- | ------------------ |
+| `ifreload`        | 依設定檔重新載入   |
+| `ifdown` / `ifup` | 關閉／啟用介面     |
+| `show`            | 檢視目前狀態、位址 |
 
 #### 網路設定步驟總結
 
-1. 決定 DHCP 或 Static  
-2. 編輯 `ifcfg-<iface>`  
-3. `wicked ifreload` 或 `ifdown` + `ifup`  
+1. 決定 DHCP 或 Static
+2. 編輯 `ifcfg-<iface>`
+3. `wicked ifreload` 或 `ifdown` + `ifup`
 4. 用 `wicked show`、`ip a`、`ping`、DNS 解析驗證
 
 ### 2-5-2. Firewall
@@ -347,8 +347,8 @@ localhost:~ # firewall-cmd --permanent --add-service ssh
 localhost:~ # firewall-cmd --reload
 ```
 
-- **`--permanent`**: 寫入永久設定  
-- **`--reload`**: 讓永久規則生效  
+- **`--permanent`**: 寫入永久設定
+- **`--reload`**: 讓永久規則生效
 - **意義**: 安裝時若 SSH port 被擋，遠端管理前必須放行 `ssh` 服務（或對應 port）。
 
 ### 2-5-3. Repository 與 Package
@@ -369,11 +369,11 @@ sle15:~ # zypper in -t pattern yast2_basis yast2_server
 sle15:~ # ls -d /mnt/Module-* | xargs -i basename {} | xargs -i zypper ar file:///mnt/{} {}
 ```
 
-| 指令／參數 | 意義 |
-| --- | --- |
-| `zypper ar` | add repository |
-| `zypper patterns` | 列出軟體模式（一組套件） |
-| `zypper in -t pattern ...` | 依 pattern 安裝 |
+| 指令／參數                 | 意義                     |
+| -------------------------- | ------------------------ |
+| `zypper ar`                | add repository           |
+| `zypper patterns`          | 列出軟體模式（一組套件） |
+| `zypper in -t pattern ...` | 依 pattern 安裝          |
 
 - **學習意義**: Minimal 安裝後若缺 YaST 模組，常需先掛載安裝媒體並加入 Module repo，再安裝 `yast2_basis` 等。
 
@@ -388,11 +388,11 @@ sle15:~ # SUSEConnect --deregister --product PackageHub/15.5/x86_64
 sle15:~ # SUSEConnect --list-extensions
 ```
 
-| 用途 | 說明 |
-| --- | --- |
-| 註冊系統 | 取得官方更新通道 |
+| 用途        | 說明                                                                    |
+| ----------- | ----------------------------------------------------------------------- |
+| 註冊系統    | 取得官方更新通道                                                        |
 | Package Hub | 社群／額外套件來源，見 [SUSE Package Hub](https://packagehub.suse.com/) |
-| Extensions | 列出可啟用擴充 |
+| Extensions  | 列出可啟用擴充                                                          |
 
 #### rpm（底層套件格式與查詢）
 
@@ -482,10 +482,10 @@ sle15:~ # chage [option] newuser
 
 #### 建議建立使用者步驟
 
-1. `useradd -m -s /bin/bash newuser`  
-2. `passwd newuser`  
-3. 依需求 `usermod -aG ...`  
-4. `chage -l newuser` 檢查密碼政策  
+1. `useradd -m -s /bin/bash newuser`
+2. `passwd newuser`
+3. 依需求 `usermod -aG ...`
+4. `chage -l newuser` 檢查密碼政策
 5. 以該使用者登入驗證家目錄與 shell
 
 ### 2-6-2. `/etc/passwd`
@@ -499,15 +499,15 @@ root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
 ```
 
-| 欄位 | 意義 |
-| --- | --- |
-| Username | 登入名稱 |
-| Password placeholder | 多為 `x`，真實雜湊在 `/etc/shadow` |
-| UID | `0`=root；系統帳常 <1000；一般使用者多從 1000 起 |
-| GID | 主要群組 ID |
-| GECOS | 全名／備註 |
-| Home | 家目錄 |
-| Shell | 如 `/bin/bash`；`/sbin/nologin` 表示不可互動登入 |
+| 欄位                 | 意義                                             |
+| -------------------- | ------------------------------------------------ |
+| Username             | 登入名稱                                         |
+| Password placeholder | 多為 `x`，真實雜湊在 `/etc/shadow`               |
+| UID                  | `0`=root；系統帳常 <1000；一般使用者多從 1000 起 |
+| GID                  | 主要群組 ID                                      |
+| GECOS                | 全名／備註                                       |
+| Home                 | 家目錄                                           |
+| Shell                | 如 `/bin/bash`；`/sbin/nologin` 表示不可互動登入 |
 
 ### 2-6-3. `/etc/shadow`
 
@@ -519,15 +519,15 @@ sle15:~ # cat /etc/shadow
 root:$6$...:19530:0:99999:7:::
 ```
 
-| 欄位 | 意義 |
-| --- | --- |
-| Username | 對應 passwd |
+| 欄位               | 意義                                               |
+| ------------------ | -------------------------------------------------- |
+| Username           | 對應 passwd                                        |
 | Encrypted password | `$6$` 等表示演算法（如 SHA-512）；`!`/`*` 常表鎖定 |
-| Last change | 自 1970-01-01 起的天數 |
-| Min / Max age | 最短／最長密碼有效天數 |
-| Warn / Inactive | 提醒天數／過期後停用天數 |
-| Expiration | 帳戶到期日 |
-| Reserved | 保留 |
+| Last change        | 自 1970-01-01 起的天數                             |
+| Min / Max age      | 最短／最長密碼有效天數                             |
+| Warn / Inactive    | 提醒天數／過期後停用天數                           |
+| Expiration         | 帳戶到期日                                         |
+| Reserved           | 保留                                               |
 
 ### 2-6-4. 群組指令
 
@@ -553,21 +553,21 @@ sle15:~ # cat /etc/group
 root:x:0:
 ```
 
-| 欄位 | 意義 |
-| --- | --- |
-| Group name | 群組名 |
-| Password placeholder | 多為 `x` |
-| GID | 群組 ID |
-| Members | 補充成員清單（主要群組成員在 passwd 指定） |
+| 欄位                 | 意義                                       |
+| -------------------- | ------------------------------------------ |
+| Group name           | 群組名                                     |
+| Password placeholder | 多為 `x`                                   |
+| GID                  | 群組 ID                                    |
+| Members              | 補充成員清單（主要群組成員在 passwd 指定） |
 
 **`/etc/gshadow`**（常見僅 root 可讀）:
 
-| 欄位 | 意義 |
-| --- | --- |
-| Group name | 群組名 |
-| Group password hash | 群組密碼雜湊 |
-| Administrators | 可管理成員的管理員 |
-| Members | 成員清單 |
+| 欄位                | 意義               |
+| ------------------- | ------------------ |
+| Group name          | 群組名             |
+| Group password hash | 群組密碼雜湊       |
+| Administrators      | 可管理成員的管理員 |
+| Members             | 成員清單           |
 
 ### 其他帳號工具
 
@@ -602,9 +602,9 @@ sle15:~ # su             # 切到 root，但不完整載入 root 環境
 sle15:~ # su - user      # 切到其他使用者
 ```
 
-| 項目 | 說明 |
-| --- | --- |
-| 優點 | 直接、快速取得目標身分 |
+| 項目 | 說明                                                     |
+| ---- | -------------------------------------------------------- |
+| 優點 | 直接、快速取得目標身分                                   |
 | 缺點 | 需分享 root 密碼；審計較弱；一旦切換即全權，誤操作風險高 |
 
 ### sudo
@@ -617,10 +617,10 @@ sle15:~ # sudo -k                # 清除認證快取
 sle15:~ # sudo -l                # 列出可用權限
 ```
 
-| 項目 | 說明 |
-| --- | --- |
+| 項目 | 說明                                                 |
+| ---- | ---------------------------------------------------- |
 | 優點 | 可精細授權、通常用自己的密碼、可審計、短時免重覆輸入 |
-| 缺點 | 需正確設定 `sudoers`，設定錯誤風險高 |
+| 缺點 | 需正確設定 `sudoers`，設定錯誤風險高                 |
 
 ### visudo 與 `/etc/sudoers`
 
@@ -654,16 +654,141 @@ SLES 預設常見 `Defaults targetpw` 搭配寬鬆規則，表示可能要求輸
 
 ## 2-8. DAC 與 MAC
 
-| 項目 | DAC（Discretionary Access Control） | MAC（Mandatory Access Control） |
-| --- | --- | --- |
-| 控制者 | 資源擁有者 | 系統強制安全政策 |
-| 權限管理 | 擁有者可 `chmod` / `chown` | 使用者無法自行放寬政策 |
-| 彈性 | 高 | 較低、較嚴格 |
-| 適用 | 一般系統 | 高安全環境 |
-| Linux 範例 | 傳統 Unix 權限 | SELinux、**AppArmor**（SLES 常見） |
+| 項目       | DAC（Discretionary Access Control） | MAC（Mandatory Access Control）    |
+| ---------- | ----------------------------------- | ---------------------------------- |
+| 控制者     | 資源擁有者                          | 系統強制安全政策                   |
+| 權限管理   | 擁有者可 `chmod` / `chown`          | 使用者無法自行放寬政策             |
+| 彈性       | 高                                  | 較低、較嚴格                       |
+| 適用       | 一般系統                            | 高安全環境                         |
+| Linux 範例 | 傳統 Unix 權限                      | SELinux、**AppArmor**（SLES 常見） |
 
 - **意義**: DAC 是基礎；MAC 在 DAC 允許時仍可能阻擋違規行為（例如服務亂讀無關家目錄）。
 - SLES 安裝摘要中常見啟用 AppArmor，屬於 MAC 路線。
+
+### File Attributes (chattr / lsattr)
+
+檔案屬性是 Linux ext2/ext3/ext4、xfs 等檔案系統內建的特殊旗標（Flags），用於控制檔案的底層行為（例如禁止修改、僅能追加寫入等）。即使是 root 使用者，也必須遵循這些屬性的限制。
+
+```bash
+sle15:~ zypper in e2fsprogs
+```
+
+- lsattr：檢視檔案的特殊屬性。
+- chattr：變更檔案的特殊屬性（常用語法：chattr [+|-|=][屬性] 檔案）。
+
+常用屬性說明
+
+- i (immutable)：不可變動。檔案無法被修改、刪除、重新命名、連結，且無法寫入資料。
+- a (append only)：僅允許追加。檔案只能以 append 模式寫入資料，無法覆蓋或刪除。
+
+1. 建立檔案與檢視預設屬性
+
+```bash
+touch test.txt
+lsattr test.txt
+# 輸出範例: --------------e--- test.txt (e 代表屬性使用 extent)
+```
+
+2. 使用 i 屬性防止檔案被修改或刪除（系統關鍵檔案防護）
+
+```bash
+# 設定 i 屬性
+chattr +i test.txt
+
+# 嘗試刪除或修改（即使使用 sudo 也會失敗）
+rm test.txt
+# 輸出: rm: cannot remove 'test.txt': Operation not permitted
+
+echo "hello" > test.txt
+# 輸出: bash: test.txt: Permission denied
+
+# 解除 i 屬性
+chattr -i test.txt
+```
+
+3. 使用 a 屬性設定日誌檔僅能追加
+
+```bash
+# 設定 a 屬性
+chattr +a test.txt
+
+# 嘗試覆蓋寫入（失敗）
+echo "overwrite" > test.txt
+# 輸出: bash: test.txt: Operation not permitted
+
+# 嘗試追加寫入（成功）
+echo "append line" >> test.txt
+
+# 解除 a 屬性
+chattr -a test.txt
+```
+
+### Extended Attributes (xattr)
+
+Linux Extended Attributes（簡稱 xattr，擴充屬性） 是檔案系統（如 ext4, xfs, btrfs）提供的一種機制，允許將自訂的「鍵值對（Key-Value Pairs）」 元數據（Metadata）直接附加到檔案或目錄的 inode 上，且不影響檔案原本的實際內容。
+
+xattr 通常分為四個命名空間（Namespace）：
+
+- user.：一般使用者可操作（需具備寫入權限）。
+- trusted.：僅限 root 使用者操作。
+- security.：由 SELinux 或 Linux Security Modules (LSM) 使用。
+- system.：由 Kernel 用於 ACLs (Access Control Lists) 等系統機制。
+
+常用的 CLI 工具為 attr 套件提供的 setfattr 與 getfattr（部分系統也可使用 xattr 指令）。
+
+```bash
+sle15:~ zypper in attr
+```
+
+使用 setfattr 與 getfattr 設定與讀取自訂中詮資料
+
+```bash
+# 設定 user 命名空間下的鍵值對
+setfattr -n user.comment -v "This is a confidential draft" test.txt
+setfattr -n user.checksum -v "a1b2c3d4" test.txt
+
+# 讀取特定屬性
+getfattr -n user.comment test.txt
+# 輸出:
+# # file: test.txt
+# user.comment="This is a confidential draft"
+
+# 列出檔案所有擴充屬性
+getfattr -d test.txt
+# 輸出:
+# # file: test.txt
+# user.checksum="a1b2c3d4"
+# user.comment="This is a confidential draft"
+
+# 刪除擴充屬性
+setfattr -x user.checksum test.txt
+```
+
+### File Attributes, File Permissions, Extended Attributes 套用順序與檢查邏輯
+
+當一個存取請求（讀取、修改、刪除等）發生時，Linux 核心會依照層次逐步評估。只有通過上一層檢查，才會進入下一層：
+
+```
+[ 存取請求 ] 
+     │
+     ▼
+┌──────────────────────────────┐
+│ 1. File Attributes (chattr)  │ ──► (若有 +i / +a 等限制，直接拒絕)
+└──────────────────────────────┘
+     │ Pass
+     ▼
+┌──────────────────────────────┐
+│ 2. File Permissions / ACLs   │ ──► (檢查 rwx 權限，無權限則拒絕)
+└──────────────────────────────┘
+     │ Pass
+     ▼
+┌──────────────────────────────┐
+│ 3. Extended Attributes       │ ──► (檢查安全性屬性，如 SELinux / Capability)
+└──────────────────────────────┘
+     │ Pass
+     ▼
+[ 執行操作 ]
+```
 
 ### 練習：DAC / MAC
 
@@ -683,11 +808,11 @@ sle15:~ $ vim file
 
 #### 三種模式
 
-| 模式 | 進入方式 | 用途 |
-| --- | --- | --- |
-| Normal | 啟動預設；Insert 中按 `Esc` | 移動、刪除、複製、撤銷 |
-| Insert | `i` / `a` / `o` 等 | 輸入文字 |
-| Command-Line | 在 Normal 按 `:` | 存檔、離開、搜尋取代、設定 |
+| 模式         | 進入方式                    | 用途                       |
+| ------------ | --------------------------- | -------------------------- |
+| Normal       | 啟動預設；Insert 中按 `Esc` | 移動、刪除、複製、撤銷     |
+| Insert       | `i` / `a` / `o` 等          | 輸入文字                   |
+| Command-Line | 在 Normal 按 `:`            | 存檔、離開、搜尋取代、設定 |
 
 #### Normal 常用
 
@@ -716,18 +841,18 @@ sle15:~ $ ssh-keygen
 sle15:~ $ ssh-copy-id user1@192.168.1.100
 ```
 
-| 項目 | 路徑／說明 |
-| --- | --- |
-| Private Key | `~/.ssh/id_rsa`（絕不可外流） |
-| Public Key | `~/.ssh/id_rsa.pub`（放到遠端 `authorized_keys`） |
-| `ssh-copy-id` | 協助部署公鑰 |
+| 項目          | 路徑／說明                                        |
+| ------------- | ------------------------------------------------- |
+| Private Key   | `~/.ssh/id_rsa`（絕不可外流）                     |
+| Public Key    | `~/.ssh/id_rsa.pub`（放到遠端 `authorized_keys`） |
+| `ssh-copy-id` | 協助部署公鑰                                      |
 
 #### 金鑰登入建議步驟
 
-1. 本機 `ssh-keygen`  
-2. `ssh-copy-id user@host`  
-3. 測試免密登入  
-4. 確認防火牆已放行 SSH  
+1. 本機 `ssh-keygen`
+2. `ssh-copy-id user@host`
+3. 測試免密登入
+4. 確認防火牆已放行 SSH
 5. （進階）再考慮關閉密碼登入
 
 ### 2-9-3. screen
@@ -740,13 +865,13 @@ sle15:~ $ screen -dr [pid.tty.host]
 sle15:~ $ screen -x [pid.tty.host]
 ```
 
-| 快捷鍵 | 作用 |
-| --- | --- |
-| `C-a c` | 開新 window |
-| `C-a "` / `C-a '` | 切換 window |
-| `C-a S` / `C-a \|` | 水平／垂直分割 |
-| `C-a Tab` | 切換窗格焦點 |
-| `C-a d`（常見） | detach，工作可在背景續跑 |
+| 快捷鍵             | 作用                     |
+| ------------------ | ------------------------ |
+| `C-a c`            | 開新 window              |
+| `C-a "` / `C-a '`  | 切換 window              |
+| `C-a S` / `C-a \|` | 水平／垂直分割           |
+| `C-a Tab`          | 切換窗格焦點             |
+| `C-a d`（常見）    | detach，工作可在背景續跑 |
 
 - **意義**: 遠端長時間工作時，即使 SSH 斷線，session 仍可保留。
 
@@ -781,12 +906,12 @@ sle15:~ $ grep -v info application.log
 sle15:~ $ grep -r fail /var
 ```
 
-| 選項 | 意義 |
-| --- | --- |
+| 選項 | 意義       |
+| ---- | ---------- |
 | `-i` | 忽略大小寫 |
-| `-n` | 顯示行號 |
-| `-v` | 反向選取 |
-| `-r` | 遞迴目錄 |
+| `-n` | 顯示行號   |
+| `-v` | 反向選取   |
+| `-r` | 遞迴目錄   |
 
 ### wc / head / tail
 
@@ -805,8 +930,8 @@ sle15:~ $ more /var/log/messages
 sle15:~ $ less /var/log/messages
 ```
 
-- `more`：基本向前分頁  
-- `less`：可前後移動、搜尋，甚至 `F` 類似 `tail -f`  
+- `more`：基本向前分頁
+- `less`：可前後移動、搜尋，甚至 `F` 類似 `tail -f`
 - 實務上讀長檔多優先 `less`
 
 ### 學習心得：Text
@@ -826,14 +951,14 @@ sle15:~ $ less /var/log/messages
 
 學習本章建議依下列順序實作：
 
-1. **先熟電源與路徑**: `uptime`、`reboot`/`shutdown`、`pwd`/`cd`/`ls`/`mkdir`  
-2. **再懂權限**: 讀 `ls -l` → `chmod`/`chown` → 目錄 `rx` 差異  
-3. **用 YaST 建立系統管理地圖**，並對照 CLI  
-4. **設定網路與防火牆**: `hostnamectl`、`ifcfg-*`、`wicked`、`firewall-cmd`  
-5. **建立套件來源**: 本地 `zypper ar` 或 `SUSEConnect`；用 `zypper`/`rpm` 查裝  
-6. **建立使用者與群組**，讀懂 `passwd`/`shadow`/`group`  
-7. **改用 sudo 做事**，並理解 `visudo`  
-8. **安裝 vim / ssh / screen**，形成遠端作業基本功  
+1. **先熟電源與路徑**: `uptime`、`reboot`/`shutdown`、`pwd`/`cd`/`ls`/`mkdir`
+2. **再懂權限**: 讀 `ls -l` → `chmod`/`chown` → 目錄 `rx` 差異
+3. **用 YaST 建立系統管理地圖**，並對照 CLI
+4. **設定網路與防火牆**: `hostnamectl`、`ifcfg-*`、`wicked`、`firewall-cmd`
+5. **建立套件來源**: 本地 `zypper ar` 或 `SUSEConnect`；用 `zypper`/`rpm` 查裝
+6. **建立使用者與群組**，讀懂 `passwd`/`shadow`/`group`
+7. **改用 sudo 做事**，並理解 `visudo`
+8. **安裝 vim / ssh / screen**，形成遠端作業基本功
 9. **用 cat/grep/head/tail/less 讀日誌與設定檔**
 
 ---
