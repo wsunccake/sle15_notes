@@ -1,12 +1,12 @@
-# ch2. 練習題 — 路徑、權限、文字工具、YaST、系統設定、帳號與 sudo
+# ch2. 練習題 — 路徑、權限、文字工具、YaST、帳號、sudo、屬性與 vim
 
-依 `raw/ch2.md`、`raw/ch2-3.md`、`raw/ch2-6.md` 整理的實作與問答練習。目標：理解路徑與權限；熟練文字工具與 YaST / 網路 / 防火牆 / zypper；能管理 **user / group / 密碼老化**，並以 **`/etc/sudoers.d/`** 做最小權限的 `sudo` 設定。
+依 `raw/ch2.md`、`raw/ch2-3.md`、`raw/ch2-6.md`、`raw/ch2-8.md` 整理的實作與問答練習。目標：理解路徑與權限；熟練文字工具與 YaST／網路／防火牆／zypper；管理帳號與 sudo；會用 **File Attributes（chattr／lsattr）**、**Extended Attributes（setfattr／getfattr）**、**vim** 進階操作，以及 I/O 重導向與管線。
 
 **建議環境**
 
 - SLES 15（或相容 Linux）任一台可登入的系統
 - 一般使用者帳號（範例使用者名：`alex`；實作時可改為目前登入使用者）
-- 練習 4～7 部分步驟需要 `root` 或已具管理權的帳號；請在實驗機操作，避免鎖死唯一管理管道
+- 練習 4～8、10 部分步驟需要 `root` 或已具管理權的帳號；`chattr` 相關請在實驗機操作，完成後記得解除鎖定
 
 ---
 
@@ -486,3 +486,197 @@ visudo -f /etc/sudoers.d/myadmin
 ```
 
 （是否使用 `NOPASSWD` 請自行評估並在報告中說明安全取捨。）
+
+---
+
+## 練習 8. File Attributes 與 Extended Attributes
+
+> File Attributes（`chattr`／`lsattr`）多用於 ext 系列等檔案系統；在 **btrfs**／**xfs** 上支援項目可能不同，請先確認檔案系統類型。實驗請用可還原的測試檔，完成後解除 immutable／append-only，避免影響系統維運。
+
+### 8-1. File Attributes（chattr / lsattr）
+
+| 小題  | 情境                                | 任務                                                                                                                          |
+| ----- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 8-1-1 | 維護重要伺服器，保護 `/etc/hosts`   | 即使 **root** 或具 sudo 者也不能誤刪、修改或改名。設定適當 attribute，並用 `lsattr` 證明；再嘗試修改／刪除應失敗              |
+| 8-1-2 | 日誌 `/var/log/custom_audit.log`    | 所有程式與管理者**只能追加**，不能刪除或覆寫舊資料。建立檔案、設定 attribute、驗證可 append、不可 truncate／overwrite／delete |
+| 8-1-3 | `/var/www/html/backup/` 重要備份    | **一次鎖定**該目錄及其內所有檔案與子目錄（遞迴）。寫出指令並用 `lsattr -R`（或等價）驗證                                      |
+| 8-1-4 | `/tmp/mysterious.log` 無法 `rm -rf` | 已是 root 仍提示 `Operation not permitted`。診斷原因（常見為 immutable），排除鎖定後刪除，並說明排查步驟                      |
+
+**常用屬性概念**
+
+| 旗標               | 意義（概念）             |
+| ------------------ | ------------------------ |
+| `i`（immutable）   | 不可改、不可刪、不可改名 |
+| `a`（append only） | 只能追加寫入             |
+
+**參考指令方向**
+
+```bash
+# 查看檔案系統
+findmnt -T /etc/hosts
+
+# 設定／查看／解除（範例）
+chattr +i /etc/hosts
+lsattr /etc/hosts
+chattr -i /etc/hosts
+
+chattr +a /var/log/custom_audit.log
+echo "test" >> /var/log/custom_audit.log
+
+chattr -R +i /var/www/html/backup/
+lsattr -R /var/www/html/backup/
+```
+
+### 8-2. Extended Attributes（xattr）
+
+系統管理員需為專案檔 `/srv/data/report.pdf` 註記作者與敏感等級（若路徑不存在，可先建立測試檔替代並在報告註明）。
+
+| 小題  | 任務                                                                       |
+| ----- | -------------------------------------------------------------------------- |
+| 8-2-1 | 新增使用者自訂屬性 **`user.author`**，值為 **`Alice`**                     |
+| 8-2-2 | 再新增 **`user.security_level`**，值為 **`confidential`**                  |
+| 8-2-3 | 檢視該檔**所有**擴充屬性名稱與對應值                                       |
+| 8-2-4 | 專案主持人改為 **Bob**，且安全等級需調整（請自行訂合理新值並寫出修改指令） |
+| 8-2-5 | 檔案已移至公開目錄，**移除** `user.security_level`，並確認只剩應保留的屬性 |
+
+**參考指令方向**
+
+```bash
+setfattr -n user.author -v Alice /srv/data/report.pdf
+setfattr -n user.security_level -v confidential /srv/data/report.pdf
+getfattr -d /srv/data/report.pdf
+
+setfattr -n user.author -v Bob /srv/data/report.pdf
+setfattr -n user.security_level -v <new_value> /srv/data/report.pdf
+
+setfattr -x user.security_level /srv/data/report.pdf
+getfattr -d /srv/data/report.pdf
+```
+
+### 作答／驗收（練習 8）
+
+1. 8-1 各題附上 `chattr`／`lsattr` 指令、失敗嘗試與成功驗證。
+2. 說明 `i` 與 `a` 的差異，以及 8-1-4 的排查流程。
+3. 8-2 附上 `setfattr`／`getfattr` 各階段輸出。
+4. 實驗結束後解除測試檔上不必要的 immutable／append-only。
+
+---
+
+## 練習 9. vim 進階操作
+
+以下預設在 **Normal mode**；請寫出按鍵或 `:` 命令列指令。可用任意練習檔實作驗證。
+
+### 9-1-1. 快速列跳轉與文字定位
+
+| 小題    | 問題                         | 作答 |
+| ------- | ---------------------------- | ---- |
+| 9-1-1-1 | 直接跳到第 **250** 行？      |      |
+| 9-1-1-2 | 跳轉後，快速到該行**行尾**？ |      |
+| 9-1-1-3 | 快速移到檔案**最後一行**？   |      |
+
+### 9-1-2. 高效複製、剪下與刪除
+
+| 小題    | 問題                                       | 作答 |
+| ------- | ------------------------------------------ | ---- |
+| 9-1-2-1 | 一次剪下（刪除）從目前游標起的 **5 行**？  |      |
+| 9-1-2-2 | 快速刪除游標所在的一個 **word**？          |      |
+| 9-1-2-3 | 將剛剪下／複製的內容貼在目前行的**下方**？ |      |
+
+### 9-1-3. 全域搜尋與取代
+
+| 小題    | 問題                                     | 作答 |
+| ------- | ---------------------------------------- | ---- |
+| 9-1-3-1 | 整份文件所有 `abc` 取代為 `xyz`          |      |
+| 9-1-3-2 | 只取代第 **10～50** 行之間               |      |
+| 9-1-3-3 | 每次取代前要 **Confirm**，應加什麼參數？ |      |
+
+### 9-1-4. 區塊選擇與多行批次編輯
+
+`/etc/hosts` 中第 **5～15** 行開頭缺少註解，需一次性在這些行最前面加上 `# `（井字號＋空白）。
+
+請寫出操作步驟（例如 Visual Block：`Ctrl-v` → 選取 → `I` → 輸入 → `Esc`），並說明如何驗證。
+
+### 9-1-5. 多檔案與視窗分割
+
+需同時對照編輯：
+
+- `/etc/nginx/nginx.conf`
+- `/etc/nginx/conf.d/default.conf`
+
+（若主機無 nginx，可改用任兩份設定檔，並在報告註明路徑。）
+
+請完成並記錄：
+
+1. 如何在 vim 中同時開啟兩個檔案（水平或垂直分割）。
+2. 如何在分割窗格間切換焦點。
+3. （加分）如何只儲存其中一個窗格、或一次儲存全部。
+
+**參考方向**
+
+```text
+vim -O file1 file2          " 垂直分割開啟
+:split / :vsplit
+Ctrl-w w / Ctrl-w h/j/k/l
+:w  /  :wa
+```
+
+### 作答／驗收（練習 9）
+
+1. 完成 9-1-1～9-1-3 按鍵／指令表。
+2. 9-1-4、9-1-5 寫出步驟；能實作者附上簡短驗證說明。
+
+---
+
+## 練習 10. 管線、重導向與區間擷取
+
+> 日誌路徑在 SLES 上可能是 `/var/log/messages` 而非 `/var/log/syslog`；請依實際環境調整並在報告註明。`/data/...` 若不存在可改用家目錄測試路徑。
+
+### 10-1. 系統日誌即時擷取與轉向寫入
+
+伺服器日誌位於 `/var/log/syslog`（或等價檔）。需分析與 **cron** 相關的紀錄。
+
+| 步驟 | 任務                                          |
+| ---- | --------------------------------------------- |
+| 1    | 擷取該日誌的**最後 50 行**                    |
+| 2    | 從中過濾包含 **CRON**（**不區分大小寫**）的列 |
+| 3    | 將過濾結果**覆蓋寫入** `/tmp/cron_recent.log` |
+
+寫出完整管線指令，並用 `wc -l`／`cat` 驗證輸出檔。
+
+### 10-2. 歷史資料附加與統計累計
+
+| 步驟 | 任務                                                                          |
+| ---- | ----------------------------------------------------------------------------- |
+| 1    | 讀取 `/etc/passwd`                                                            |
+| 2    | 計算總行數（帳號數量）                                                        |
+| 3    | 將結果以 **Append** 寫入 `/var/log/user_count.log` 末尾（**不可覆蓋**舊資料） |
+
+提示：可將時間戳與計數一併寫入，方便定期監控。
+
+### 10-3. 檔案指定區間擷取
+
+大型資料檔 `/data/large_dataset.csv`（可用測試檔替代）只需第 **11～20** 行（共 10 行）。
+
+| 要求 | 說明                                     |
+| ---- | ---------------------------------------- |
+| 工具 | 使用 **`head` 與 `tail` 搭配管線**       |
+| 輸出 | 存成 `/data/sample_10.csv`（或測試路徑） |
+
+### 10-4. 錯誤訊息分離與重導向
+
+搜尋 `/var/log/` 下含 `error` 的內容時，部分路徑會產生 `Permission denied`（**stderr**）。
+
+| 要求   | 說明                                                            |
+| ------ | --------------------------------------------------------------- |
+| 搜尋   | 在 `/var/log/` 下找含 `error` 的列（可用 `grep -R`／`grep -r`） |
+| stdout | 正確結果寫入 `/tmp/search_result.log`                           |
+| stderr | 丟棄到 `/dev/null`（不顯示、不儲存）                            |
+
+**參考型態**
+
+```bash
+tail -n 50 /var/log/messages | grep -i CRON > /tmp/cron_recent.log
+wc -l /etc/passwd >> /var/log/user_count.log
+head -n 20 /data/large_dataset.csv | tail -n 10 > /data/sample_10.csv
+grep -Ri error /var/log/ > /tmp/search_result.log 2>/dev/null
+```
