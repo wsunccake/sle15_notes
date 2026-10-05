@@ -1,6 +1,6 @@
 # ch3. 練習題 — 系統觀測與排查
 
-依 `content/ch3.md` 整理的實作與問答練習。目標：能辨識行程與資源握持；盤點 CPU／記憶體／磁碟／網卡；用即時監控抓住當下尖峰；用統計工具驗證是否持續；並依分層步驟排查網路連線問題。
+依 `content/ch3.md` 整理，並併入 `raw/ch3.md` 修飾後的實作題。目標：能辨識行程與資源握持；盤點 CPU／記憶體／磁碟／網卡／NUMA；用即時監控抓住當下尖峰；用統計工具驗證是否持續；並依分層步驟排查網路連線問題。
 
 **建議環境**
 
@@ -12,7 +12,7 @@
 **安裝提示（實驗機，按需）**
 
 ```bash
-sudo zypper in sysstat iotop iftop nethogs vnstat tcpdump nmap traceroute bind-utils hwinfo
+zypper in sysstat iotop iftop nethogs vnstat tcpdump nmap traceroute bind-utils hwinfo numactl hwloc
 ```
 
 （套件名稱依實際 repo 可能略有差異；沒有的工具可改寫「為何無法執行／等價指令」。）
@@ -125,18 +125,47 @@ renice 15 -p <PID>
 | 2-3-3 | 寫出對 PID `12345` 將 nice 改為 `15` 的指令              |      |
 | 2-3-4 | 為什麼長期把關鍵行程的 nice 調成很大的負值仍可能有風險？ |      |
 
-### 2-4. `jobs` / `fg` / `bg`
+### 2-4. 工作控制實作：暫停、背景、前台、找出 PID 並結束
 
-完整操作一次並記錄畫面：
+情境：在前景執行會持續輸出的工作。按下 **Ctrl+Z** 後，畫面會顯示 `Stopped`。
+
+建議啟動方式（擇一；方式 A 較能看到「背景繼續印訊息」）：
 
 ```bash
+# 方式 A：持續印訊息
+while true; do echo "$(date) still running"; sleep 2; done
+
+# 方式 B：較安靜
 sleep 300
-# Ctrl+Z
+```
+
+| 小題  | 任務                                                                                                          | 作答／指令 |
+| ----- | ------------------------------------------------------------------------------------------------------------- | ---------- |
+| 2-4-1 | 查看 Job 清單：輸入什麼指令可確認剛剛被暫停的工作編號（Job ID）？                                             |            |
+| 2-4-2 | 切到背景繼續執行：工作已暫停，但希望它在背景繼續跑（方式 A 會繼續印訊息），不要佔用終端輸入。請下達什麼指令？ |            |
+| 2-4-3 | 調回前景（Foreground）：訊息在終端滾動干擾操作時，請下達指令將它調回前台，再按 **Ctrl+Z** 暫停。              |            |
+| 2-4-4 | 找出執行這個 `while` 迴圈或 `sleep` 的 **PID**                                                                |            |
+| 2-4-5 | 取得 PID 後，如何結束這個程序？（先 TERM，必要時再 SIGKILL）                                                  |            |
+| 2-4-6 | 如何確認該程序已完全消失？                                                                                    |            |
+
+**參考方向**
+
+```bash
 jobs
 bg %1
-jobs
 fg %1
-# 另試：script.sh &   （可用 sleep 120 & 代替）
+# Ctrl+Z
+
+ps aux | grep -E 'sleep|while'
+pgrep -a sleep
+pstree -p $$          # 看目前 shell 的子行程
+
+kill <PID>            # 先 TERM
+# kill -9 <PID>       # 仍殘留再考慮
+
+ps -p <PID>           # 無輸出或 error 通常表示已結束
+pgrep -a sleep
+jobs                  # 清單應不再列出該 job
 ```
 
 | 操作        | 意義／你觀察到什麼 |
@@ -156,7 +185,7 @@ fg %1
 
 1. 完成訊號與 nice 概念表。
 2. 附上對 `sleep` 測試行程的 PID、訊號與結束驗證。
-3. 工作控制需實際按過 `Ctrl+Z`、`bg`、`fg`。
+3. 工作控制需實際按過 `Ctrl+Z`、`jobs`、`bg`、`fg`，並完成 2-4-1～2-4-6（含 PID 與確認程序消失）。
 
 ---
 
@@ -224,26 +253,45 @@ lsof /var/log/messages
 
 虛擬機環境中，這些指令看到的是 Hypervisor 提供的**虛擬硬體**，請在報告中註明是 VM 或實體機。
 
-### 4-1. CPU
+### 4-1. CPU（實體核心、邏輯核心與虛擬化）
+
+伺服器宣稱有 2 顆實體 CPU（Multi-socket）時，需從輸出欄位核對效能規格，而不是只看廣告數字。
 
 ```bash
 lscpu
 cat /proc/cpuinfo
 ```
 
-| 項目                                    | 本機記錄 |
-| --------------------------------------- | -------- |
-| CPU(s)                                  |          |
-| Thread(s) per core / Core(s) per socket |          |
-| Model name                              |          |
-| 虛擬化相關旗標（若有）                  |          |
+| 項目                              | 本機記錄 |
+| --------------------------------- | -------- |
+| Socket(s)                         |          |
+| Core(s) per socket                |          |
+| Thread(s) per core                |          |
+| CPU(s)                            |          |
+| Model name                        |          |
+| Flags 中的 `vmx` 或 `svm`（若有） |          |
+| `Virtualization:` 列（若有）      |          |
 
-| 小題  | 問題                                                                   | 作答 |
-| ----- | ---------------------------------------------------------------------- | ---- |
-| 4-1-1 | `lscpu` 與 `/proc/cpuinfo` 分別適合看「摘要」還是「各邏輯 CPU 細節」？ |      |
-| 4-1-2 | 確認 vCPU 數量，如何避免把「單核過載」誤判成應用程式 bug？             |      |
+| 小題  | 問題                                                                                                                    | 作答 |
+| ----- | ----------------------------------------------------------------------------------------------------------------------- | ---- |
+| 4-1-1 | `lscpu` 與 `/proc/cpuinfo` 分別適合看「摘要」還是「各邏輯 CPU 細節」？                                                  |      |
+| 4-1-2 | 如何用輸出欄位算出 **實體核心（Physical Cores）** 與 **邏輯核心（Logical CPU / Threads）**？寫出計算式與本機結果。      |      |
+| 4-1-3 | 確認 CPU 是否支援硬體虛擬化（VT-x / AMD-V）以便部署 KVM。應看 `lscpu` 哪個欄位或 Flags？Intel 與 AMD 常見旗標各是什麼？ |      |
+| 4-1-4 | 確認 vCPU 數量後，如何避免把「單核過載」誤判成應用程式 bug？                                                            |      |
 
-### 4-2. RAM
+**計算提示**
+
+```text
+實體核心 ≈ Socket(s) × Core(s) per socket
+邏輯核心 ≈ CPU(s)
+         ≈ Socket(s) × Core(s) per socket × Thread(s) per core
+```
+
+虛擬機上看到的是 Hypervisor 提供的虛擬硬體；Socket／旗標可能與 Host 實體規格不同。
+
+### 4-2. RAM（應用程式回報記憶體不足）
+
+應用程式經常回報記憶體不足時，需要精確、且易於人類閱讀（Human-readable）的記憶體狀態。
 
 ```bash
 free -h
@@ -252,15 +300,16 @@ cat /proc/meminfo
 
 | 小題  | 問題                                                                          | 作答 |
 | ----- | ----------------------------------------------------------------------------- | ---- |
-| 4-2-1 | `free -h` 中 total／used／free／buff/cache／available 各代表什麼？            |      |
-| 4-2-2 | 為什麼 Linux 常看起來 free 很小？應優先看哪個欄位判斷「還能不能再吃記憶體」？ |      |
-| 4-2-3 | 記錄本機 `free -h` 的 available 與 free，並解釋差異                           |      |
+| 4-2-1 | 哪個指令能以人類可讀單位顯示記憶體使用量？寫出完整指令。                      |      |
+| 4-2-2 | `free -h` 中 total／used／free／buff/cache／available 各代表什麼？            |      |
+| 4-2-3 | 為什麼 Linux 常看起來 free 很小？應優先看哪個欄位判斷「還能不能再吃記憶體」？ |      |
+| 4-2-4 | 記錄本機 `free -h` 的 available 與 free，並解釋差異                           |      |
 
 ### 4-3. Disk
 
 ```bash
 lsblk
-sudo fdisk -l
+fdisk -l
 df -h
 ```
 
@@ -276,37 +325,120 @@ df -h
 | 4-3-2 | 用 `lsblk` 對照**根目錄**位在哪個裝置／分割               |
 | 4-3-3 | 說明排查順序：為何先 `df` 再 `lsblk`，必要時才看 I/O 工具 |
 
-### 4-4. PCI / USB / NIC / DMI / NUMA
+### 4-4. NIC 介面（`ip` / `ethtool`）
 
 ```bash
-lspci -vv
-lsusb -v
 ip a
 # ifconfig          # 舊式；可能需額外套件
-sudo ethtool eth0   # 將 eth0 換成實際介面名
-sudo dmidecode
-sudo dmidecode -t baseboard
-sudo dmidecode -t bios
-sudo dmidecode -t chassis
-hwinfo
-# lshw
-hwloc-ls
-lstopo-no-graphics
+ethtool eth0   # 將 eth0 換成實際介面名
 ```
 
 | 小題  | 問題                                                          | 作答 |
 | ----- | ------------------------------------------------------------- | ---- |
 | 4-4-1 | `ip a` 與 `ifconfig` 在現代 SLES 上如何取捨？                 |      |
 | 4-4-2 | `ethtool` 適合看哪些網卡層資訊（速率、雙工、驅動、offload）？ |      |
-| 4-4-3 | `dmidecode` 讀的是什麼資料？VM 中內容取決於什麼？             |      |
-| 4-4-4 | 為什麼多插槽／NUMA 系統有時要用 `hwloc-ls`／`lstopo`？        |      |
-| 4-4-5 | 空間問題、裝置關係、效能問題，各應先看哪類指令？              |      |
+
+### 4-5. UMA / NUMA 拓樸
+
+多插槽伺服器上，記憶體與 CPU 的遠近會影響延遲。單插槽或一般 VM 也可能只有 1 個 NUMA node，仍請記錄實際輸出。
+
+```bash
+lscpu | grep -i numa
+numactl --hardware
+numastat
+ls /sys/devices/system/node/
+hwloc-ls
+lstopo-no-graphics
+```
+
+| 小題  | 問題                                                                                                                                              | 作答 |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 4-5-1 | 解釋 **UMA（Uniform Memory Access）** 與 **NUMA（Non-Uniform Memory Access）** 的主要差異。                                                       |      |
+| 4-5-2 | 一台雙 Socket 伺服器，如何確認系統共有幾個 **NUMA Node**，以及每個 Node 分別包含哪些 **CPU 邏輯核心** 與多少 **記憶體容量**？寫出指令與本機結果。 |      |
+| 4-5-3 | 如何顯示每個 Node 的記憶體 **size** 與 **free**？                                                                                                 |      |
+| 4-5-4 | 為什麼高效能與資料庫調校常需檢視 NUMA 拓樸？`hwloc-ls`／`lstopo` 適合看什麼？                                                                     |      |
+
+**判讀提示**
+
+- `lscpu`：`NUMA node(s)`、`NUMA node0 CPU(s)` …
+- `numactl --hardware`：各 node 的 cpus、size、free
+- 若指令不存在，可改看 `/sys/devices/system/node/node*/meminfo` 與 `cpulist`
+
+### 4-6. DMI：記憶體插槽與主機板（不停機盤點）
+
+準備採購記憶體擴充，但不能停機拆機殼看型號。VM 中 DMI 內容取決於虛擬化層，空插槽資訊可能不完整，請在報告註明。
+
+```bash
+dmidecode -t memory
+dmidecode -t system
+dmidecode -t baseboard
+dmidecode -t bios
+dmidecode -t chassis
+hwinfo
+# lshw
+```
+
+| 小題  | 任務                                                                                                                                                                      | 作答 |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 4-6-1 | 用 `dmidecode` 查出記憶體插槽與規格（Memory），以及主機板／系統廠商（System / Motherboard）。寫出指令，並記錄廠商、型號、現有模組 Size／Type／Speed（能看到的欄位即可）。 |      |
+| 4-6-2 | 用 `dmidecode` 確認主機板是否還有空的記憶體插槽（Slots）。哪個欄位表示「此槽未插模組」？本機空槽數量？                                                                    |      |
+| 4-6-3 | `dmidecode` 讀的是什麼資料？VM 中內容取決於什麼？                                                                                                                         |      |
+
+**判讀提示**
+
+- 記憶體：`-t memory` 中的 `Size`、`Type`、`Speed`、`Locator`／`Bank Locator`
+- 空槽常見文字：`Size: No Module Installed`
+- 系統／主機板：`-t system`、`-t baseboard` 的 `Manufacturer`、`Product Name`
+
+### 4-7. PCI：新插網卡系統看不到介面
+
+剛插入一張萬兆（10GbE）網卡，但 `ip a` 沒有新介面。先確認硬體層是否偵測到，再看驅動是否載入。實驗機若無實體 10GbE，改對現有 Ethernet／VMXNET 裝置做同樣查詢。
+
+```bash
+lspci | grep -iE 'ethernet|network'
+lspci -k
+lspci -vv
+```
+
+| 小題  | 任務                                                                                                    | 作答 |
+| ----- | ------------------------------------------------------------------------------------------------------- | ---- |
+| 4-7-1 | 如何快速確認硬體層面是否成功偵測到這張網卡？寫出指令與相關 `lspci` 列。                                 |      |
+| 4-7-2 | 如何查看該 PCIe 裝置目前載入的 **核心驅動程式（Kernel driver in use）** 與 **模組（Kernel modules）**？ |      |
+
+**判讀提示**
+
+```bash
+# 先找 Bus ID，再查驅動，例如：
+lspci -k -s 03:00.0
+```
+
+- 有裝置、無 `Kernel driver in use`：常見於缺驅動、未 bind，或 passthrough 給其他 Guest
+- 有驅動但仍無 `ip a` 介面：再查 `dmesg`、模組參數、是否被 NetworkManager／wicked 管理
+
+### 4-8. USB Storage：對應區塊裝置名稱
+
+插上外接 USB Storage 後，需確認它在系統中叫什麼裝置（如 `/dev/sdb`），才能分割或掛載。無實體 USB 時，可用 `lsusb`／`lsblk` 記錄現有匯流排與區塊裝置樹，並說明若插入時會多看哪一段 `dmesg`。
+
+```bash
+lsusb
+lsusb -v
+lsblk
+dmesg | tail -n 50
+```
+
+| 小題  | 任務                                                                           | 作答 |
+| ----- | ------------------------------------------------------------------------------ | ---- |
+| 4-8-1 | 如何查看外接硬碟對應到系統中的**區塊裝置名稱**？寫出指令與本機（或模擬）結果。 |      |
+| 4-8-2 | 空間問題、裝置關係、效能問題，各應先看哪類指令？                               |      |
 
 ### 作答／驗收（練習 4）
 
-1. 記錄 CPU、`free -h`、根目錄對應裝置。
-2. 用文字說明 Guest 規格 ≠ Host 實體規格。
-3. 至少完成 `ip a` 與一張網卡的 `ethtool`（若權限／介面允許）。
+1. 記錄 CPU 計算式（實體核心／邏輯核心）與虛擬化旗標。
+2. 用 `free -h` 解釋 available 與 free。
+3. 用 `lsblk` 與 `df -h` 對照根目錄裝置。
+4. 完成 UMA／NUMA 差異，並附上 Node 數量、CPU 清單、size／free（環境只有 1 個 node 也可）。
+5. `dmidecode` 記錄記憶體規格與空槽；PCI 網卡寫出驅動欄位；USB／區塊裝置寫出對應名稱。
+6. 用文字說明 Guest 規格 ≠ Host 實體規格。
 
 ---
 
@@ -338,7 +470,7 @@ top
 ### 5-2. `iotop`
 
 ```bash
-sudo iotop
+iotop
 ```
 
 **頂部摘要**
@@ -369,9 +501,9 @@ sudo iotop
 ### 5-3. `iftop` 與 `nethogs`
 
 ```bash
-sudo iftop -i eth0     # 換成實際介面
-sudo nethogs -d 1
-sudo nethogs eth0
+iftop -i eth0     # 換成實際介面
+nethogs -d 1
+nethogs eth0
 ```
 
 | 小題  | 問題                                                         | 作答 |
@@ -538,11 +670,11 @@ ss -tunlp
 | `-a` |              |
 
 | 小題  | 任務                                                                   |
-| ----- | ---------------------------------------------------------------------- | --- |
+| ----- | ---------------------------------------------------------------------- |
 | 7-3-1 | 找出本機 SSH 的監聽位址、埠與行程（PID／程式名）                       |
 | 7-3-2 | 列出目前 `LISTEN` 的服務                                               |
 | 7-3-3 | 說明如何用 `ss` 診斷 `Address already in use`，並與 `lsof -i` 交叉驗證 |
-| 7-3-4 | 「本機 ss 顯示 LISTEN」是否等於「外網可連」？中間還差哪些層？          |     |
+| 7-3-4 | 「本機 ss 顯示 LISTEN」是否等於「外網可連」？中間還差哪些層？          |
 
 ### 7-4. DNS：`dig` / `nslookup` / `host`
 
@@ -580,8 +712,8 @@ dig example.com MX
 ### 8-1. 防火牆與路由
 
 ```bash
-sudo iptables -L -n -v
-sudo firewall-cmd --list-all
+iptables -L -n -v
+firewall-cmd --list-all
 ip r
 ```
 
@@ -600,8 +732,8 @@ ip r
 ### 8-2. `tcpdump`
 
 ```bash
-sudo tcpdump -i eth0 port 80
-sudo tcpdump -i any -n -s0 -w capture.pcap
+tcpdump -i eth0 port 80
+tcpdump -i any -n -s0 -w capture.pcap
 ```
 
 | 選項  | 意義（請填） |
