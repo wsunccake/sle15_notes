@@ -1,6 +1,6 @@
 # ch4. SUSE Linux Enterprise Server 15 - Service
 
-本章說明 SLES 15 常見網路與基礎服務的演進背景、軟體選型、設定檔參數、啟用步驟與驗證方法。每個服務皆依「為何需要 → 如何安裝 → 如何設定 → 如何放行防火牆 → 如何驗證」展開，作為企業環境遠端管理、身分目錄、檔案共享、名稱解析、位址分配與安裝自動化的實作基礎。
+本章說明 SLES 15 常見網路與基礎服務的演進背景、軟體選型、設定檔參數、啟用步驟與驗證方法。先建立 **systemd** 服務管理基礎，再依「為何需要 → 如何安裝 → 如何設定 → 如何放行防火牆 → 如何驗證」展開各網路服務，作為企業環境遠端管理、身分目錄、檔案共享、名稱解析、位址分配與安裝自動化的實作基礎。
 
 通用操作模式（多數服務相同）：
 
@@ -13,7 +13,191 @@
 
 ---
 
-## 4-1. SSH（Secure Shell）
+## 4-1. systemd（服務與開機管理）
+
+幾乎所有後續章節的服務（`sshd`、`chronyd`、`named`、`apache2` 等）都透過 **systemd** 管理生命週期。理解 init 演進、runlevel／target 對應，以及 unit 設定檔寫法，是操作本章其餘服務的共通前提。
+
+### 演進：SysVinit → Upstart → systemd
+
+| 階段 | 代表 | 時間約略 | 特色與限制 |
+| --- | --- | --- | --- |
+| **SysVinit** | `init`、`/etc/inittab`、`/etc/rc.d`／`init.d` 腳本 | 長期傳統 | 依 runlevel 循序啟動 shell 腳本；依賴關係弱、平行度差、狀態回報不一致 |
+| **Upstart** | Ubuntu 等一度採用 | 約 2006 起 | 事件驅動（event-based），改善平行啟動與服務重啟；後續生態轉向 systemd |
+| **systemd** | 多數現代發行版預設（含 SLES） | 約 2010 起廣泛擴散 | 以 unit 描述服務／掛載／計時器等；平行啟動、依賴圖、socket／path 啟動、日誌整合（journal）、統一管理介面 |
+
+- **意義**: SysV 腳本「能跑」但難標準化；Upstart 引入事件模型；systemd 把開機、服務、掛載、計時器納入同一套 unit 與依賴體系。  
+- SLES 15 實務上以 **systemd** 為準；舊文件若寫 `service foo start` 或 `/etc/init.d/foo`，多半可對應到 `systemctl`。
+
+```text
+SysVinit（循序 rc 腳本）
+    → Upstart（事件驅動）
+        → systemd（unit + 依賴圖 + journal）
+```
+
+### runlevel 觀念：SysV init vs systemd
+
+傳統 SysV 用 **runlevel（0–6）** 表示系統模式；systemd 改以 **target**（目標單元）表達，並提供相容對應。
+
+| SysV runlevel | 傳統意義 | systemd target（常見） |
+| --- | --- | --- |
+| 0 | 關機 | `poweroff.target` |
+| 1 | 單人維護模式 | `rescue.target` |
+| 3 | 多使用者、文字模式（無圖形） | `multi-user.target` |
+| 5 | 多使用者、圖形介面 | `graphical.target` |
+| 6 | 重新開機 | `reboot.target` |
+
+| 項目 | SysV init | systemd |
+| --- | --- | --- |
+| 切換模式 | `telinit N`／`init N` | `systemctl isolate <target>` |
+| 預設模式 | `/etc/inittab` 的 `id:N:initdefault:` | `/etc/systemd/system/default.target`（常為指向 multi-user 或 graphical 的 symlink） |
+| 查目前 | `runlevel` | `systemctl get-default`、`systemctl list-units --type=target` |
+| 服務腳本 | `/etc/init.d/<name>` + chkconfig／update-rc.d | `/etc/systemd/system/` 或 `/usr/lib/systemd/system/` 的 `*.service` |
+
+```bash
+sle15:~ # systemctl get-default
+sle15:~ # systemctl set-default multi-user.target
+sle15:~ # runlevel
+sle15:~ # systemctl isolate multi-user.target
+```
+
+- **意義**: 伺服器常見預設 `multi-user.target`（約當舊 runlevel 3）；桌面才用 `graphical.target`。  
+- `isolate` 會切換到指定 target 並停下不屬於該 target 的單位，影響大，生產環境需謹慎。
+
+### 常用指令
+
+#### 服務生命週期
+
+```bash
+sle15:~ # systemctl status sshd
+sle15:~ # systemctl start sshd
+sle15:~ # systemctl stop sshd
+sle15:~ # systemctl restart sshd
+sle15:~ # systemctl reload sshd
+sle15:~ # systemctl enable sshd
+sle15:~ # systemctl disable sshd
+sle15:~ # systemctl enable --now sshd
+sle15:~ # systemctl is-active sshd
+sle15:~ # systemctl is-enabled sshd
+```
+
+| 指令 | 意義 |
+| --- | --- |
+| `status` | 目前狀態、最近日誌摘要、PID |
+| `start`／`stop` | 立即啟動／停止（不改開機是否啟用） |
+| `restart` | 停止後再啟動 |
+| `reload` | 在支援的前提下重載設定（不斷開服務） |
+| `enable`／`disable` | 設定／取消開機自動啟動（建立／移除 wants 連結） |
+| `enable --now` | 開機啟用並立即 start |
+| `is-active`／`is-enabled` | 腳本友善的狀態查詢 |
+
+#### 檢視與除錯
+
+```bash
+sle15:~ # systemctl list-units --type=service
+sle15:~ # systemctl list-unit-files --type=service
+sle15:~ # systemctl cat sshd.service
+sle15:~ # systemctl daemon-reload
+sle15:~ # journalctl -u sshd -xe
+sle15:~ # journalctl -u sshd -f
+```
+
+| 指令 | 意義 |
+| --- | --- |
+| `list-units` | 目前已載入的 unit |
+| `list-unit-files` | 系統上的 unit 檔與 enable 狀態 |
+| `cat` | 顯示實際生效的 unit 內容（含 drop-in） |
+| `daemon-reload` | 修改 unit 檔後重新載入 systemd 設定 |
+| `journalctl -u` | 依服務看 journal 日誌；`-f` 持續追蹤 |
+
+#### 建議操作步驟
+
+1. `systemctl status <svc>` 確認現況  
+2. 修改設定檔或 unit 後，必要時 `daemon-reload`  
+3. `restart` 或 `reload`  
+4. 再 `status`／`journalctl -u` 驗證  
+5. 需要開機自動啟動再 `enable`
+
+### 撰寫 service 設定檔（unit）
+
+自訂服務通常放在：
+
+| 路徑 | 意義 |
+| --- | --- |
+| `/usr/lib/systemd/system/` | 套件提供的 unit（盡量勿直接改） |
+| `/etc/systemd/system/` | 管理員自訂或覆寫（優先） |
+| `/etc/systemd/system/<name>.service.d/*.conf` | drop-in 片段覆寫部分參數 |
+
+#### 最小 service 範例
+
+```ini
+# /etc/systemd/system/myapp.service
+[Unit]
+Description=My Sample Application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=myapp
+Group=myapp
+WorkingDirectory=/opt/myapp
+ExecStart=/opt/myapp/bin/myapp --config /etc/myapp.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+| 區段／參數 | 意義 |
+| --- | --- |
+| `[Unit] Description` | 人類可讀說明 |
+| `After=` | 啟動順序：在列出的 unit 之後（不自動拉起對方） |
+| `Wants=`／`Requires=` | 弱／強依賴；`Requires` 失敗常導致本服務也不啟動 |
+| `[Service] Type=` | `simple`（預設，ExecStart 為主行程）、`forking`（傳統 daemon 自行 fork）、`oneshot`、`notify` 等 |
+| `ExecStart=` | 啟動命令（建議用絕對路徑） |
+| `ExecReload=` | reload 時執行的命令 |
+| `Restart=` | 失敗或結束時是否自動重啟 |
+| `User=`／`Group=` | 降權執行 |
+| `[Install] WantedBy=` | `enable` 時掛到哪個 target（伺服器常用 `multi-user.target`） |
+
+#### 啟用自訂服務的步驟
+
+```bash
+sle15:~ # vi /etc/systemd/system/myapp.service
+sle15:~ # systemctl daemon-reload
+sle15:~ # systemctl enable --now myapp
+sle15:~ # systemctl status myapp
+sle15:~ # journalctl -u myapp -xe
+```
+
+| 步驟 | 意義 |
+| --- | --- |
+| 寫入 unit | 描述如何啟動與依賴 |
+| `daemon-reload` | 讓 systemd 讀到新檔或變更 |
+| `enable --now` | 開機啟用並立即啟動 |
+| `status`／`journalctl` | 驗證成功或讀錯誤訊息 |
+
+- 修改套件原廠 unit 時，優先用 **drop-in**（`systemctl edit myapp`），避免套件升級覆寫自訂內容。
+
+### 學習心得：systemd
+
+- 後續所有 `systemctl enable --now <服務>` 都建立在 unit 與 target 觀念上。  
+- runlevel 數字仍可能出現在舊文件；對應到 target 後較不易誤操作。  
+- 改 unit 後忘記 `daemon-reload`，是「檔案改了但行為沒變」的常見原因。  
+- 日誌優先查 `journalctl -u`，再查服務自己的 log 檔。
+
+### 練習：systemd
+
+1. 用表格對照 SysVinit、Upstart、systemd 至少三項差異。  
+2. 說明 runlevel 3／5 與 `multi-user.target`／`graphical.target` 的對應。  
+3. 寫出對某服務完成「立即啟動 + 開機啟用 + 看日誌」的指令序列。  
+4. 撰寫一個 `Type=simple` 的示範 `.service`，標註 `After`、`ExecStart`、`WantedBy` 的意義，並說明為何要 `daemon-reload`。
+
+---
+
+## 4-2. SSH（Secure Shell）
 
 ### 演進歷史
 
@@ -144,7 +328,7 @@ client:~ $ ssh -p 2222 alice@192.168.1.100
 
 ---
 
-## 4-2. NTP / Chrony（時間同步）
+## 4-3. NTP / Chrony（時間同步）
 
 ### 演進歷史
 
@@ -232,7 +416,7 @@ logdir /var/log/chrony
 
 ---
 
-## 4-3. NIS（Network Information Service）
+## 4-4. NIS（Network Information Service）
 
 NIS（原 Yellow Pages）可在內網集中發佈帳號、群組等對應表，讓多台主機共用同一套使用者資訊。現代企業更常改用 LDAP／AD；學習 NIS 有助理解「目錄服務」的古典模型與風險（明文／弱認證環境需隔離）。
 
@@ -339,7 +523,7 @@ client:~ # getent passwd
 
 ---
 
-## 4-4. NFS（Network File System）
+## 4-5. NFS（Network File System）
 
 NFS 讓 Client 把遠端目錄掛成本地路徑，適合共用資料、家目錄、安裝來源等。
 
@@ -428,7 +612,7 @@ client:~ # vi /etc/fstab
 
 ---
 
-## 4-5. DNS（Domain Name System）
+## 4-6. DNS（Domain Name System）
 
 ### 軟體生態
 
@@ -543,7 +727,7 @@ client:~ # nslookup pc1.example.com
 
 ---
 
-## 4-6. DHCP（Dynamic Host Configuration Protocol）
+## 4-7. DHCP（Dynamic Host Configuration Protocol）
 
 ### 常見軟體
 
@@ -627,7 +811,7 @@ client:~ # ip addr show
 
 ---
 
-## 4-7. Web（Apache HTTP Server）
+## 4-8. Web（Apache HTTP Server）
 
 ```bash
 server:~ # zypper install apache2 apache2-prefork yast2-http-server
@@ -662,7 +846,7 @@ server:~ # firewall-cmd --reload
 
 ---
 
-## 4-8. FTP（vsftpd）
+## 4-9. FTP（vsftpd）
 
 FTP 歷史悠久，但控制與資料通道分離、且常明文；正式環境應優先考慮 SFTP／FTPS。實驗室仍可用 vsftpd 理解主動／被動模式與防火牆需求。
 
@@ -721,7 +905,7 @@ client:~ # ftp 192.168.0.1
 
 ---
 
-## 4-9. TELNET（對照學習）
+## 4-10. TELNET（對照學習）
 
 Telnet 以明文傳輸，僅建議在隔離實驗網理解「為何被 SSH 取代」。
 
@@ -747,7 +931,7 @@ client:~ # telnet <server>
 
 ---
 
-## 4-10. TFTP（Trivial FTP）
+## 4-11. TFTP（Trivial FTP）
 
 TFTP 基於 UDP、無強認證，常用於 PXE 開機檔、網路裝置組態傳送。必須限制在管理網段。
 
@@ -777,7 +961,7 @@ tftp> get hostname
 
 ---
 
-## 4-11. MUNGE（認證服務）
+## 4-12. MUNGE（認證服務）
 
 MUNGE（MUNGE Uid 'N' Gid Emporium）常見於 HPC 叢集（如與 Slurm 搭配），用共享金鑰證明訊息來自可信主機且未被竄改。
 
@@ -818,7 +1002,7 @@ client:~ # systemctl enable --now munge.service
 
 ---
 
-## 4-12. PXE（Preboot Execution Environment）
+## 4-13. PXE（Preboot Execution Environment）
 
 PXE 讓主機開機時經由網路取得開機載入器與安裝核心，常用於大量安裝。典型組合：
 
@@ -925,14 +1109,15 @@ Alias /sle15 "/mnt"
 
 建議實作順序（由管理面到自動化）：
 
-1. **SSH**：安全遠端管理底座
-2. **Chrony**：時間同步（後面目錄、叢集、憑證都依賴）
-3. **DNS / DHCP**：名稱與位址基礎設施
-4. **NFS / FTP / TFTP**：檔案傳遞與開機檔分發
-5. **Apache**：HTTP 安裝來源與網站服務
-6. **NIS**（古典目錄）或評估更現代的目錄方案
-7. **MUNGE**：叢集信任基礎
-8. **PXE**：串起 DHCP+TFTP+HTTP 完成自動安裝
+1. **systemd**：先掌握 `systemctl`／target／unit，後續服務才有共通操作語言
+2. **SSH**：安全遠端管理底座
+3. **Chrony**：時間同步（後面目錄、叢集、憑證都依賴）
+4. **DNS / DHCP**：名稱與位址基礎設施
+5. **NFS / FTP / TFTP**：檔案傳遞與開機檔分發
+6. **Apache**：HTTP 安裝來源與網站服務
+7. **NIS**（古典目錄）或評估更現代的目錄方案
+8. **MUNGE**：叢集信任基礎
+9. **PXE**：串起 DHCP+TFTP+HTTP 完成自動安裝
 
 每個服務固定檢查清單：
 
@@ -946,4 +1131,4 @@ Alias /sle15 "/mnt"
 
 ## 總結
 
-本章把 SLES 常見服務串成一條可實作的基礎設施路線：SSH 解決安全遠端進入，Chrony 保證時間一致，DNS／DHCP 提供識別與連線參數，NFS／FTP／TFTP／HTTP 負責內容傳遞，NIS／MUNGE 涉及身分與節點信任，PXE 則把前面多項服務組成自動安裝流水線。學習重點不只是「服務能啟動」，而是理解每份設定檔參數的意義、防火牆與協定行為，以及用 Client 驗證閉環。掌握後，即可在實驗室重現企業常見的基礎網路服務架構，並為後續更高階的系統管理打下基礎。
+本章把 SLES 常見服務串成一條可實作的基礎設施路線：先以 systemd 統一服務生命週期與開機目標，再以 SSH 解決安全遠端進入，Chrony 保證時間一致，DNS／DHCP 提供識別與連線參數，NFS／FTP／TFTP／HTTP 負責內容傳遞，NIS／MUNGE 涉及身分與節點信任，PXE 則把前面多項服務組成自動安裝流水線。學習重點不只是「服務能啟動」，而是理解 unit／設定檔參數的意義、防火牆與協定行為，以及用 Client 驗證閉環。掌握後，即可在實驗室重現企業常見的基礎網路服務架構，並為後續更高階的系統管理打下基礎。

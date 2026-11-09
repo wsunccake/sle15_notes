@@ -1,6 +1,6 @@
 # ch6. SUSE Linux Enterprise Server 15 - Science Computing
 
-科學計算（Science Computing）環境通常需要：**高效能編譯器 / MPI 工具鏈**，以及依授權安裝的領域應用軟體（量子化學、固態物理、分子動力學等）。本章說明 Intel oneAPI 與 NVIDIA HPC SDK 的安裝與使用步驟，並介紹 VASP、Gaussian、GROMACS、Quantum ESPRESSO 的背景與建置要點。實作前建議先具備第 5 章的 Lmod / Slurm 觀念，以便管理多版本工具鏈與批次作業。
+科學計算（Science Computing）環境通常需要：**高效能編譯器 / MPI 工具鏈**，以及依授權安裝的領域應用軟體（量子化學、固態物理、分子動力學等）。本章說明 Intel oneAPI 與 NVIDIA HPC SDK 的安裝與使用步驟，介紹 VASP、Gaussian、GROMACS、Quantum ESPRESSO 的背景與建置要點，並說明 **LM-X License Server** 的部署與查詢。實作前建議先具備第 5 章的 Lmod / Slurm 與第 4 章 systemd 觀念，以便管理多版本工具鏈、批次作業與授權服務。
 
 參考總表：[List of quantum chemistry and solid-state physics software](https://en.wikipedia.org/wiki/List_of_quantum_chemistry_and_solid-state_physics_software)
 
@@ -543,6 +543,152 @@ sle15:~/test # g16 test0000.com
 
 ---
 
+## 6-3. LM-X License Server（授權伺服器）
+
+科學計算軟體（如部分商業套件）常以 **License Server** 控管同時使用人數與功能模組。**LM-X** 是常見的授權中介之一：伺服器讀取 `.lic` 檔並對外提供授權查詢；用戶端應用連到指定 host／port 取得授權後才能執行。本節以 **LMXTools** 在 SLES 上的部署為例，涵蓋解壓、手動測試、設定檔、systemd 常駐與查詢工具。
+
+### 定位與前置
+
+| 項目 | 說明 |
+| --- | --- |
+| 角色 | License Server（發放／回收授權） |
+| 典型元件 | `lmx-serv`（伺服器）、`lmxendutil`（查 hostid／授權狀態）、`.lic`、`.cfg` |
+| 前置 | 合法授權檔、防火牆放行授權埠（範例常用 **6200**）、建議以 systemd 管理（見 ch4 systemd） |
+
+### 安裝與手動測試
+
+```bash
+sle15:~ # unzip LMXTools481_Linux64.zip -d /opt
+```
+
+| 步驟 | 意義 |
+| --- | --- |
+| 解壓到 `/opt` | 得到如 `/opt/LMXTools481_Linux64/` 的工具目錄（版本號依實際套件） |
+
+手動啟動測試（確認二進位、授權檔、設定檔可運作後，再改為 service）：
+
+```bash
+sle15:~ # /opt/LMXTools481_Linux64/lmx-serv \
+  -b \
+  -l /opt/demo.lic \
+  -c /opt/LMXTools481_Linux64/lmx-serv.cfg \
+  -lf /var/log/lmx-serv.log
+```
+
+| 參數 | 意義 |
+| --- | --- |
+| `-b` | 背景執行（daemon 模式，依工具文件為準） |
+| `-l` | 指定 license 檔路徑（亦可改在 cfg 內設定） |
+| `-c` | 設定檔路徑 |
+| `-lf` | 日誌檔路徑 |
+
+- 手動測試成功後，應能以 `lmxendutil` 查到授權狀態；再改由 systemd 管理，避免登出後行程消失。
+
+### 設定授權檔路徑：`lmx-serv.cfg`
+
+可在設定檔中指定單一檔案或目錄下多個 `.lic`：
+
+```conf
+# lmx-serv.cfg
+# 單一授權檔
+LICENSE_FILE = /opt/lmx/licenses/demo.lic
+
+# 或載入目錄內所有 .lic
+# LICENSE_FILE = /opt/lmx/licenses/*.lic
+```
+
+| 寫法 | 意義 |
+| --- | --- |
+| 單一路徑 | 明確指定一個 demo／正式 lic |
+| `*.lic` | 便於多產品／多檔授權集中管理 |
+
+- 路徑需與實際放置位置一致；權限應讓執行 `lmx-serv` 的使用者可讀。  
+- 更換或新增 lic 後，通常需重載／重啟服務（依 LM-X 版本行為為準）。
+
+### 寫成 systemd service
+
+```bash
+sle15:~ # vi /etc/systemd/system/lmx-serv.service
+sle15:~ # systemctl daemon-reload
+sle15:~ # systemctl enable lmx-serv
+sle15:~ # systemctl start lmx-serv
+sle15:~ # systemctl status lmx-serv
+```
+
+#### unit 範例
+
+```ini
+# /etc/systemd/system/lmx-serv.service
+[Unit]
+Description=LM-X License Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/LMXTools481_Linux64
+ExecStart=/opt/LMXTools481_Linux64/lmx-serv -c /opt/LMXTools481_Linux64/lmx-serv.cfg -lf /var/log/lmx-serv.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+| 參數 | 意義 |
+| --- | --- |
+| `After=network.target` | 網路就緒後再啟動，避免授權埠綁定失敗 |
+| `WorkingDirectory` | 工作目錄，相對路徑與執行環境較穩定 |
+| `ExecStart` | 以 cfg 與 log 路徑啟動；正式環境建議絕對路徑 |
+| `Restart=always` | 異常結束後自動拉起 |
+| `WantedBy=multi-user.target` | `enable` 後於多使用者模式開機啟動 |
+
+- 修改 unit 後務必 `daemon-reload`。  
+- 生產環境可評估改以非 root 專用帳號執行，並限制 lic／log 目錄權限。  
+- 防火牆需放行授權埠（範例查詢使用 **6200**）：
+
+```bash
+sle15:~ # firewall-cmd --permanent --add-port=6200/tcp
+sle15:~ # firewall-cmd --reload
+```
+
+### 查詢 Host ID 與授權狀態
+
+```bash
+sle15:~ # /opt/LMXTools481_Linux64/lmxendutil -hostid
+sle15:~ # /opt/LMXTools481_Linux64/lmxendutil -licstat -host 127.0.0.1 -port 6200
+```
+
+| 指令 | 意義 |
+| --- | --- |
+| `-hostid` | 取得本機 Host ID，供廠商簽發／綁定授權檔 |
+| `-licstat` | 向指定 host／port 查詢授權使用狀態 |
+| `-host`／`-port` | License Server 位址與埠（本機測試可用 `127.0.0.1`） |
+
+#### 建議部署步驟
+
+1. 解壓 LMXTools 至 `/opt`  
+2. 放置 `.lic`，編輯 `lmx-serv.cfg` 的 `LICENSE_FILE`  
+3. 手動啟動一次並看 `/var/log/lmx-serv.log`  
+4. `lmxendutil -hostid`／`-licstat` 驗證  
+5. 寫入 systemd unit → `daemon-reload` → `enable --now`  
+6. 放行防火牆埠；用戶端指向該 Server 的 IP 與 port  
+
+### 學習心得：LM-X
+
+- 授權服務與計算節點分離時，DNS／IP、埠、防火牆與開機自動啟動缺一不可。  
+- 先手動跑通，再 systemd 化，較易分辨是二進位／lic 問題還是 unit 問題。  
+- Host ID 變更（重裝、換網卡、複製 VM）常導致 lic 失效，搬遷前需向供應商確認綁定政策。
+
+### 練習：LM-X
+
+1. 說明 `LICENSE_FILE` 指定單一檔與 `*.lic` 的適用情境。  
+2. 寫出將 `lmx-serv` 納入 systemd 的完整指令序列，並解釋為何需要 `daemon-reload`。  
+3. 說明 `-hostid` 與 `-licstat` 分別在授權申請與日常維運中的用途。  
+4. 若 Client 連不到授權，列出至少三個檢查點（服務狀態、埠／防火牆、cfg 路徑）。
+
+---
+
 ## 步驟總結
 
 科學計算環境落地建議順序：
@@ -554,11 +700,12 @@ sle15:~/test # g16 test0000.com
    - VASP：遷移 makefile 至 `icx` / `ifx` / `mpiifx`，`make std`，跑 testsuite
    - Gaussian：依賴套件 → 解壓 → 調整架構旗標 → `bldg16` → 設定 `GAUSS_*`
    - GROMACS / QE：依官方建置系統編譯、測試、安裝
-5. **接到資源管理器**: 以 Slurm 提交，明確指定模組、行程數、scratch 目錄
-6. **文件化版本組合**: 編譯器版本 × MPI × 應用版本，確保計算可重現
+5. **部署授權服務（若需要）**: LM-X → cfg／lic → 手動驗證 → systemd → 防火牆 → `lmxendutil`
+6. **接到資源管理器**: 以 Slurm 提交，明確指定模組、行程數、scratch 目錄
+7. **文件化版本組合**: 編譯器版本 × MPI × 應用版本 × 授權伺服器位址，確保計算可重現
 
 ---
 
 ## 總結
 
-本章把科學計算所需的「工具鏈」與「應用層」串起來：Intel oneAPI 與 NVIDIA HPC SDK 分別代表 CPU 最佳化與 GPU / 加速器路線的主流選擇；VASP、Gaussian、GROMACS、Quantum ESPRESSO 則覆蓋授權型與開源型的量子化學 / 材料 / 分子動力學需求。實務成敗關鍵往往不在單一指令，而在**版本一致、環境可載入、makefile 跟隨編譯器世代、測試算例先通過、再交給佇列系統批次執行**。完成後，叢集即可提供可重現的科學計算軟體棧，供教學與研究作業使用。
+本章把科學計算所需的「工具鏈」與「應用層」串起來：Intel oneAPI 與 NVIDIA HPC SDK 分別代表 CPU 最佳化與 GPU / 加速器路線的主流選擇；VASP、Gaussian、GROMACS、Quantum ESPRESSO 則覆蓋授權型與開源型的量子化學 / 材料 / 分子動力學需求；**LM-X License Server** 則補上商業授權軟體常需的授權發放與查詢基礎設施。實務成敗關鍵往往不在單一指令，而在**版本一致、環境可載入、makefile 跟隨編譯器世代、授權服務穩定可達、測試算例先通過、再交給佇列系統批次執行**。完成後，叢集即可提供可重現的科學計算軟體棧，供教學與研究作業使用。
